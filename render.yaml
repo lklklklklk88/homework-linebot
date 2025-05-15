@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: homework-linebot
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    plan: free
+    envVars:
+      - key: LINE_CHANNEL_SECRET
+        value: <your_channel_secret>
+      - key: LINE_CHANNEL_ACCESS_TOKEN
+        value: <your_channel_access_token>
