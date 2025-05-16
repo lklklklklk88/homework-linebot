@@ -1,15 +1,18 @@
+import os
+import json
+import tempfile
+
 from flask import Flask, request, abort
+from dotenv import load_dotenv
+
+import firebase_admin
+from firebase_admin import credentials, db  # db 有用到
+from firebase_admin import initialize_app   # 你如果用 initialize_app() 就留
+
 from linebot.v3.webhook import WebhookHandler, MessageEvent
 from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
 from linebot.v3.messaging.models import TextMessage, ReplyMessageRequest
 from linebot.exceptions import InvalidSignatureError
-
-import firebase_admin
-from firebase_admin import credentials, db
-import os
-from dotenv import load_dotenv
-
-
 
 app = Flask(__name__)
 
@@ -24,20 +27,19 @@ configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # Firebase 初始化
-import json
-import tempfile
-
 cred_json = os.getenv("GOOGLE_CREDENTIALS")
 if not cred_json:
     raise Exception("GOOGLE_CREDENTIALS 環境變數未設定")
 
-# 將字串寫入臨時檔案，作為 Firebase 證書來源
+cred_dict = json.loads(cred_json)
+cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")  # 修正換行
+
 with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".json") as temp:
-    temp.write(cred_json)
+    json.dump(cred_dict, temp)
     temp.flush()
     cred = credentials.Certificate(temp.name)
 
-firebase_admin.initialize_app(cred, {
+initialize_app(cred, {
     'databaseURL': 'https://homework-linebot-default-rtdb.firebaseio.com/'
 })
 
