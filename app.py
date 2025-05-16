@@ -90,15 +90,24 @@ def handle_message(event):
     elif text.startswith("完成作業"):
         try:
             index = int(text.replace("完成作業", "").strip()) - 1
-            data[index]["done"] = True
-            save_data(data, user_id)
-            reply = f"已完成第 {index+1} 項作業：{data[index]['task']}"
-        except:
-            reply = "找不到該作業編號，請確認輸入格式。"
+            if 0 <= index < len(data):
+                removed_task = data.pop(index)  # ✅ 刪除指定作業
+                save_data(data, user_id)
+                reply = f"已完成作業：{removed_task['task']}"
+            else:
+                reply = "作業編號無效。請輸入正確的編號。"
+        except ValueError:
+            reply = "請輸入正確格式，例如：完成作業 2"
+
 
     elif text == "查看作業":
-        undone = [f"{i+1}. {d['task']}" for i, d in enumerate(data) if not d["done"]]
-        reply = "目前未完成作業：\n" + "\n".join(undone) if undone else "所有作業都完成了，太棒了！"
+        if data:
+            reply = "📋 你的作業清單：\n"
+            for i, task in enumerate(data):
+                status = "✅" if task["done"] else "🔲"
+                reply += f"{i+1}. {status} {task['task']}\n"
+        else:
+            reply = "目前沒有任何作業。"
 
     else:
         reply = "請使用以下指令：\n1. 新增作業 作業內容\n2. 完成作業 編號\n3. 查看作業"
