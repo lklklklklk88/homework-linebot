@@ -84,14 +84,14 @@ def handle_message(event):
     if text.startswith("新增作業"):
         task = text.replace("新增作業", "").strip()
         data.append({"task": task, "done": False})
-        save_data(data)
+        save_data(data, user_id)
         reply = f"已新增作業：{task}"
 
     elif text.startswith("完成作業"):
         try:
             index = int(text.replace("完成作業", "").strip()) - 1
             data[index]["done"] = True
-            save_data(data)
+            save_data(data, user_id)
             reply = f"已完成第 {index+1} 項作業：{data[index]['task']}"
         except:
             reply = "找不到該作業編號，請確認輸入格式。"
