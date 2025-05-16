@@ -39,10 +39,9 @@ with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".json") as tem
     temp.flush()
     cred = credentials.Certificate(temp.name)
 
-initialize_app(cred, {
-    'databaseURL': 'https://homework-linebot-default-rtdb.firebaseio.com/'
+firebase_admin.initialize_app(cred, {
+    'databaseURL': os.getenv("FIREBASE_DB_URL")
 })
-
 
 # 從 Firebase 載入作業資料
 def load_data():
