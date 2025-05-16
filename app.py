@@ -43,15 +43,16 @@ firebase_admin.initialize_app(cred, {
     'databaseURL': os.getenv("FIREBASE_DB_URL")
 })
 
+
 # 從 Firebase 載入作業資料
-def load_data():
-    ref = db.reference("tasks")
+def load_data(user_id):
+    ref = db.reference(f"users/{user_id}/tasks")
     data = ref.get()
     return data if data else []
 
 # 將資料存回 Firebase
-def save_data(data):
-    ref = db.reference("tasks")
+def save_data(data, user_id):
+    ref = db.reference(f"users/{user_id}/tasks")
     ref.set(data)
 
 @app.route("/")
@@ -72,11 +73,13 @@ def callback():
 
 @handler.add(MessageEvent)
 def handle_message(event):
+    user_id = event.source.user_id
+
     if event.message.type != 'text':
         return
 
     text = event.message.text.strip()
-    data = load_data()
+    data = load_data(user_id)
 
     if text.startswith("新增作業"):
         task = text.replace("新增作業", "").strip()
