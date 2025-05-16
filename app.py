@@ -22,7 +22,15 @@ configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # Firebase 初始化
-cred = credentials.Certificate("homework-linebot-firebase-adminsdk-fbsvc-a7cf0dc76e.json")
+import json
+
+cred_json = os.getenv("GOOGLE_CREDENTIALS")
+if not cred_json:
+    raise Exception("GOOGLE_CREDENTIALS 環境變數未設定")
+
+cred_dict = json.loads(cred_json)
+cred = credentials.Certificate(cred_dict)
+
 firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://homework-linebot-default-rtdb.firebaseio.com/'
 })
