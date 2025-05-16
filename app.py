@@ -1,32 +1,42 @@
 from flask import Flask, request, abort
-from linebot.v3.webhook import WebhookHandler
+from linebot.v3.webhook import WebhookHandler, MessageEvent
 from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
 from linebot.v3.messaging.models import TextMessage, ReplyMessageRequest
 from linebot.exceptions import InvalidSignatureError
-from linebot.v3.webhook import MessageEvent
 
-import json
+import firebase_admin
+from firebase_admin import credentials, db
+import os
+from dotenv import load_dotenv
 
 app = Flask(__name__)
 
-# LINE 設定（請替換成你自己的）
-LINE_CHANNEL_ACCESS_TOKEN = 'XzJXYb1P2VCAbEiyF2ucW/hBWXE1bLyleEhb3hBm7lLauM7yXq+UUQD5Ugxw0Q7QEuXXKlOMBrBOPt8KFYKISvMX7woSIw9k1hClU4V/5nyED3OgAJ9GZlK3FdWEoZzxiFl3Sg2HA47JG05r4mSHkQdB04t89/1O/w1cDnyilFU='
-LINE_CHANNEL_SECRET = '0129e7873b7013e19660fa60c28ed6b8'
+# 載入 .env 環境變數
+load_dotenv()
+
+# LINE 設定（從 .env 讀取）
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
 
 configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# 讀取作業資料
-def load_data():
-    try:
-        with open('data.json', 'r') as f:
-            return json.load(f)
-    except:
-        return []
+# Firebase 初始化
+cred = credentials.Certificate("homework-linebot-firebase-adminsdk-fbsvc-a7cf0dc76e.json")
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://homework-linebot-default-rtdb.firebaseio.com/'
+})
 
+# 從 Firebase 載入作業資料
+def load_data():
+    ref = db.reference("tasks")
+    data = ref.get()
+    return data if data else []
+
+# 將資料存回 Firebase
 def save_data(data):
-    with open('data.json', 'w') as f:
-        json.dump(data, f, indent=2)
+    ref = db.reference("tasks")
+    ref.set(data)
 
 @app.route("/")
 def home():

@@ -1,0 +1,17 @@
+# Python 編譯與快取
+__pycache__/
+*.py[cod]
+
+# 環境變數設定
+.env
+*.env
+
+# Firebase 金鑰
+*.json
+
+# 測試用資料或 SQLite（如果有）
+*.sqlite3
+
+# 系統暫存
+*.log
+/tmp/
