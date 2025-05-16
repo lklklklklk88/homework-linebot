@@ -9,6 +9,8 @@ from firebase_admin import credentials, db
 import os
 from dotenv import load_dotenv
 
+
+
 app = Flask(__name__)
 
 # 載入 .env 環境變數
@@ -23,17 +25,22 @@ handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # Firebase 初始化
 import json
+import tempfile
 
 cred_json = os.getenv("GOOGLE_CREDENTIALS")
 if not cred_json:
     raise Exception("GOOGLE_CREDENTIALS 環境變數未設定")
 
-cred_dict = json.loads(cred_json)
-cred = credentials.Certificate(cred_dict)
+# 將字串寫入臨時檔案，作為 Firebase 證書來源
+with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".json") as temp:
+    temp.write(cred_json)
+    temp.flush()
+    cred = credentials.Certificate(temp.name)
 
 firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://homework-linebot-default-rtdb.firebaseio.com/'
 })
+
 
 # 從 Firebase 載入作業資料
 def load_data():
