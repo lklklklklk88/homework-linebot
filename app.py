@@ -345,9 +345,9 @@ def handle_message(event):
                     if due_date < now:
                         symbol = "❌"
                     elif due_date == now:
-                        label = "（🔥 今天到期）"
+                        label = "\n（🔥 今天到期）"
                     elif due_date == now + datetime.timedelta(days=1):
-                        label = "（⚠️ 明天到期）"
+                        label = "\n（⚠️ 明天到期）"
                 except:
                     pass
 
@@ -356,7 +356,7 @@ def handle_message(event):
                 "layout": "horizontal",
                 "contents": [
                     {"type": "text", "text": f"{i+1}.", "size": "sm", "flex": 1},
-                    {"type": "text", "text": f"{symbol} {task['task']}", "size": "sm", "flex": 4},
+                    {"type": "text", "text": f"{symbol} {task['task']}", "size": "sm", "flex": 6, "wrap": True, "maxLines": 3},
                     {"type": "text", "text": f"{due}{label}", "size": "sm", "flex": 5, "wrap": True}
                 ]
             })
