@@ -219,18 +219,55 @@ def handle_message(event):
             )
         return
 
-    elif text.startswith("完成作業"):
-        try:
-            index = int(text.replace("完成作業", "").strip()) - 1
-            if 0 <= index < len(data):
-                removed_task = data.pop(index)  # ✅ 刪除指定作業
-                save_data(data, user_id)
-                reply = f"已完成作業：{removed_task['task']}"
-            else:
-                reply = "作業編號無效。請輸入正確的編號。"
-        except ValueError:
-            reply = "請輸入正確格式，例如：完成作業 2"
+    elif text == "完成作業":
+        if not data:
+            reply = "目前沒有任何作業可完成。"
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text=reply)]
+                    )
+                )
+            return
 
+        buttons = []
+        for i, task in enumerate(data):
+            if not task.get("done", False):
+                buttons.append({
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": f"✅ {task['task']}",
+                        "data": f"complete_task_{i}"
+                    },
+                    "style": "primary"
+                })
+
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {"type": "text", "text": "選擇要完成的作業", "weight": "bold", "size": "lg"},
+                    *buttons
+                ]
+            }
+        }
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[FlexMessage(
+                        alt_text="選擇要完成的作業",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                )
+            )
+        return
 
     elif text == "查看作業":
         if data:
@@ -352,6 +389,20 @@ def handle_postback(event):
             message = f"✅ 已新增作業：{task['task']}（未設定截止日）"
         else:
             message = "⚠️ 找不到暫存作業，請重新新增。"
+    
+    elif data.startswith("complete_task_"):
+        try:
+            index = int(data.replace("complete_task_", ""))
+            tasks = load_data(user_id)
+            if 0 <= index < len(tasks):
+                tasks[index]["done"] = True
+                save_data(tasks, user_id)
+                message = f"✅ 已完成作業：{tasks[index]['task']}"
+            else:
+                message = "⚠️ 無法找到指定作業。"
+        except:
+            message = "⚠️ 操作錯誤，請稍後再試。"
+
 
     else:
         message = "⚠️ 無法識別的操作。"
