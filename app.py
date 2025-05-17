@@ -15,6 +15,7 @@ from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
 from linebot.v3.messaging.models import TextMessage, ReplyMessageRequest
 from linebot.exceptions import InvalidSignatureError
 from linebot.v3.messaging.models import PushMessageRequest
+from linebot.v3.messaging.models import QuickReply, QuickReplyItem, MessageAction
 
 app = Flask(__name__)
 
@@ -198,6 +199,34 @@ def handle_message(event):
         except ValueError:
             reply = "請輸入正確格式，例如：提醒時間 08:30"
 
+    elif text == "選單":
+        flex_message = {
+            "type": "flex",
+            "altText": "操作選單",
+            "contents": {
+                "type": "bubble",
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "contents": [
+                        {"type": "text", "text": "🛠 功能選單", "weight": "bold", "size": "lg"},
+                        {"type": "text", "text": "請選擇你要執行的操作：", "size": "sm", "margin": "md"},
+                        {"type": "button", "action": {"type": "message", "label": "➕ 新增作業", "text": "新增作業"}},
+                        {"type": "button", "action": {"type": "message", "label": "📋 查看作業", "text": "查看作業"}},
+                        {"type": "button", "action": {"type": "message", "label": "⏰ 設定提醒時間", "text": "提醒時間"}}
+                    ]
+                }
+            }
+        }
+
+        with ApiClient(configuration) as api_client:
+            messaging_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[flex_message]
+                )
+            )
+        return
 
     else:
         reply = "請使用以下指令：\n1. 新增作業 作業內容\n2. 完成作業 編號\n3. 查看作業"
@@ -207,7 +236,14 @@ def handle_message(event):
         messaging_api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(text=reply)]
+                messages=[TextMessage(
+                text=reply,
+                quick_reply=QuickReply(items=[
+                    QuickReplyItem(action=MessageAction(label="新增作業", text="新增作業")),
+                    QuickReplyItem(action=MessageAction(label="查看作業", text="查看作業")),
+                    QuickReplyItem(action=MessageAction(label="選單", text="選單"))
+    ])
+)]
             )
         )
 
