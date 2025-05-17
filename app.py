@@ -89,11 +89,17 @@ def remind():
             remind_datetime = now.replace(hour=remind_dt.hour, minute=remind_dt.minute, second=0, microsecond=0)
 
             # 計算現在時間與提醒時間的差距（秒數）
-            diff_sec = abs((now - remind_datetime).total_seconds())
+            remind_dt = datetime.datetime.strptime(remind_time, "%H:%M")
+            remind_datetime = now.replace(hour=remind_dt.hour, minute=remind_dt.minute, second=0, microsecond=0)
 
-            # 若差距超過 300 秒，就跳過
-            if diff_sec > 300:
+            # 若提醒時間晚於現在，就跳過
+            if now < remind_datetime:
                 continue
+
+            # 若提醒時間比現在早超過 5 分鐘，也跳過
+            if (now - remind_datetime).total_seconds() > 300:
+                continue
+
         except Exception as e:
             print(f"[remind] 使用者 {user_id} 的提醒時間格式錯誤：{remind_time}")
             continue
