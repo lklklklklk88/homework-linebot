@@ -16,7 +16,7 @@ from linebot.v3.messaging.models import TextMessage, ReplyMessageRequest
 from linebot.exceptions import InvalidSignatureError
 from linebot.v3.messaging.models import PushMessageRequest
 from linebot.v3.webhooks import PostbackEvent
-from linebot.v3.messaging.models import FlexMessage, PostbackAction, DatetimePickerAction, Bubble, Box, Text, ButtonComponent
+from linebot.v3.messaging.models import FlexMessage
 
 
 app = Flask(__name__)
@@ -188,23 +188,33 @@ def handle_message(event):
         session_ref = db.reference(f"users/{user_id}/session")
         session_ref.set({"awaiting_task_name": True})  # 設定狀態
 
+        flex_content = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "✏️ 請先傳送作業名稱（例如：離散作業一）",
+                        "wrap": True
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "datetimepicker",
+                            "label": "📅 選擇截止日期",
+                            "data": "action=select_due",
+                            "mode": "date"
+                        }
+                    }
+                ]
+            }
+        }
+
         flex_message = FlexMessage(
             alt_text="新增作業",
-            contents=Bubble(
-                body=Box(
-                    layout="vertical",
-                    contents=[
-                        Text(text="✏️ 請先傳送作業名稱（例如：離散作業一）", wrap=True),
-                        ButtonComponent(
-                            action=DatetimePickerAction(
-                                label="📅 選擇截止日期",
-                                data="action=select_due",
-                                mode="date"
-                            )
-                        )
-                    ]
-                )
-            )
+            contents=flex_content
         )
 
         with ApiClient(configuration) as api_client:
