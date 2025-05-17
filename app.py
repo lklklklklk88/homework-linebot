@@ -102,7 +102,7 @@ def remind():
         message = "📋 以下是你尚未完成的作業：\n"
         has_task = False
         for task in tasks:
-            if not task.get("done", False):
+            if not task.get("done", False) and not task.get("reminded", False):
                 has_task = True
                 due_str = task.get("due", "")
                 highlight = ""
@@ -128,6 +128,7 @@ def remind():
                     )
                 )
                 print(f"[remind] 已推送提醒給 {user_id}")
+                save_data(tasks, user_id)
             except Exception as e:
                 print(f"[remind] 推送失敗給 {user_id}：{e}")
     return "OK"
