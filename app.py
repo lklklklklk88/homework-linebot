@@ -43,10 +43,9 @@ with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".json") as tem
     temp.flush()
     cred = credentials.Certificate(temp.name)
 
-firebase_admin.initialize_app(cred, {
-    'databaseURL': os.getenv("FIREBASE_DB_URL")
-})
-
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': os.getenv("FIREBASE_DB_URL")
+    })
 
 # 從 Firebase 載入作業資料
 def load_data(user_id):
@@ -388,10 +387,10 @@ def handle_message(event):
                         messages=[FlexMessage(
                             alt_text="清除已完成作業",
                             contents=FlexContainer.from_dict(bubble)
-                        )]
+                            )]
+                        )
                     )
-                )
-        return
+            return
 
     elif text == "清除已截止作業":
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
@@ -529,8 +528,9 @@ def handle_message(event):
             ReplyMessageRequest(
                 reply_token=event.reply_token,
                 messages=[TextMessage(text=reply)]
-    )
-)
+            )
+        )
+    return
 
 @handler.add(PostbackEvent)
 def handle_postback(event):
@@ -747,6 +747,7 @@ def handle_postback(event):
                 messages=[TextMessage(text=message)]
             )
         )
+    return
 
 if __name__ == "__main__":
     app.run()
