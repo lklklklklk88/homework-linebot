@@ -691,6 +691,14 @@ def handle_postback(event):
             message = f"🧹 已清除 {removed} 筆已完成的作業。"
         else:
             message = "✅ 沒有已完成的作業需要清除。"
+        
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=message)]
+                )
+            )
 
     elif data == "clear_expired_all":
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
