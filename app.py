@@ -16,8 +16,7 @@ from linebot.v3.messaging.models import TextMessage, ReplyMessageRequest
 from linebot.exceptions import InvalidSignatureError
 from linebot.v3.messaging.models import PushMessageRequest
 from linebot.v3.messaging.models import FlexMessage, FlexContainer
-from linebot.v3.webhook import PostbackEvent
-
+from linebot.v3.webhooks import PostbackEvent
 
 app = Flask(__name__)
 
