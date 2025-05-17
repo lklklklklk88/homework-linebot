@@ -289,7 +289,7 @@ def handle_message(event):
         if data:
             reply = "📋 你的作業清單：\n"
             for i, task in enumerate(data):
-                status = "✅" if task["done"] else "🔲"
+                status = "✅" if task["done"] else "❌"
                 due = task.get("due", "未設定")
                 reply += f"{i+1}. {status} {task['task']}({due})\n"
         else:
@@ -347,7 +347,7 @@ def handle_message(event):
                     {
                         "type": "button",
                         "action": {"type": "message", "label": "🧹 清除已完成作業", "text": "清除已完成作業"},
-                        "style": "secondary"
+                        "style": "destructive"
                     }
 
                 ]
