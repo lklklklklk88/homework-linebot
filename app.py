@@ -82,8 +82,21 @@ def remind():
     for user_id, user_data in users.items():
         tasks = user_data.get("tasks", [])
         remind_time = user_data.get("remind_time", "08:00")
-        if remind_time != current_time_str:
+        try:
+            # 將提醒時間字串轉成時間物件
+            remind_dt = datetime.datetime.strptime(remind_time, "%H:%M")
+            remind_datetime = now.replace(hour=remind_dt.hour, minute=remind_dt.minute, second=0, microsecond=0)
+
+            # 計算現在時間與提醒時間的差距（秒數）
+            diff_sec = abs((now - remind_datetime).total_seconds())
+
+            # 若差距超過 120 秒，就跳過
+            if diff_sec > 120:
+                continue
+        except Exception as e:
+            print(f"[remind] 使用者 {user_id} 的提醒時間格式錯誤：{remind_time}")
             continue
+
 
         message = "📋 以下是你尚未完成的作業：\n"
         has_task = False
