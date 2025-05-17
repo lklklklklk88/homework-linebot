@@ -699,6 +699,7 @@ def handle_postback(event):
                     messages=[TextMessage(text=message)]
                 )
             )
+        return
 
     elif data == "clear_expired_all":
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
