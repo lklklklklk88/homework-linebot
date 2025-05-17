@@ -187,7 +187,14 @@ def handle_message(event):
         try:
             datetime.datetime.strptime(time_str, "%H:%M")
             db.reference(f"users/{user_id}/remind_time").set(time_str)
-            reply = f"提醒時間已設定為：{time_str}"
+
+            # ✅ 這段是重點：把 reminded 清掉
+            tasks = load_data(user_id)
+            for task in tasks:
+                task["reminded"] = False
+            save_data(tasks, user_id)
+
+            reply = f"提醒時間已設定為：{time_str}（提醒狀態已重置）"
         except ValueError:
             reply = "請輸入正確格式，例如：提醒時間 08:30"
 
