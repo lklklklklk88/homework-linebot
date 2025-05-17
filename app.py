@@ -241,7 +241,7 @@ def handle_message(event):
                         "label": f"✅ {task['task']}",
                         "data": f"complete_task_{i}"
                     },
-                    "style": "primary"
+                    "style": "secondary"  # ← 原本是 primary，改為 secondary（灰色）
                 })
 
         bubble = {
@@ -268,17 +268,7 @@ def handle_message(event):
                 )
             )
         return
-
-    elif text == "查看作業":
-        if data:
-            reply = "📋 你的作業清單：\n"
-            for i, task in enumerate(data):
-                status = "✅" if task["done"] else "🔲"
-                due = task.get("due", "未設定")
-                reply += f"{i+1}. {status} {task['task']}({due})\n"
-        else:
-            reply = "目前沒有任何作業。"
-
+    
     elif text.startswith("提醒時間"):
         time_str = text.replace("提醒時間", "").strip()
         try:
@@ -294,6 +284,36 @@ def handle_message(event):
             reply = f"提醒時間已設定為：{time_str}（提醒狀態已重置）"
         except ValueError:
             reply = "請輸入正確格式，例如：提醒時間 08:30"
+
+    elif text == "查看作業":
+        if data:
+            reply = "📋 你的作業清單：\n"
+            for i, task in enumerate(data):
+                status = "✅" if task["done"] else "🔲"
+                due = task.get("due", "未設定")
+                reply += f"{i+1}. {status} {task['task']}({due})\n"
+        else:
+            reply = "目前沒有任何作業。"
+
+    elif text == "清除已完成作業":
+        original_len = len(data)
+        new_data = [task for task in data if not task.get("done", False)]
+        save_data(new_data, user_id)
+
+        removed = original_len - len(new_data)
+        if removed > 0:
+            reply = f"🧹 已清除 {removed} 筆已完成的作業。"
+        else:
+            reply = "✅ 沒有已完成的作業需要清除。"
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=reply)]
+                )
+            )
+        return
 
     elif text == "選單":
         bubble = {
@@ -323,7 +343,13 @@ def handle_message(event):
                         "type": "button",
                         "action": {"type": "message", "label": "📋 查看作業", "text": "查看作業"},
                         "style": "secondary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {"type": "message", "label": "🧹 清除已完成作業", "text": "清除已完成作業"},
+                        "style": "secondary"
                     }
+
                 ]
             }
         }
