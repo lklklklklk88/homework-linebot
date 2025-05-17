@@ -82,10 +82,17 @@ def handle_message(event):
     data = load_data(user_id)
 
     if text.startswith("新增作業"):
-        task = text.replace("新增作業", "").strip()
-        data.append({"task": task, "done": False})
+        content = text.replace("新增作業", "").strip()
+        parts = content.rsplit(" ", 1)  # 嘗試把最後一個當作日期處理
+        if len(parts) == 2:
+            task, due = parts
+        else:
+            task = parts[0]
+            due = "未設定"
+        data.append({"task": task.strip(), "due": due.strip(), "done": False})
         save_data(data, user_id)
-        reply = f"已新增作業：{task}"
+        reply = f"已新增作業：{task.strip()}（截止日：{due.strip()})"
+
 
     elif text.startswith("完成作業"):
         try:
@@ -105,9 +112,11 @@ def handle_message(event):
             reply = "📋 你的作業清單：\n"
             for i, task in enumerate(data):
                 status = "✅" if task["done"] else "🔲"
-                reply += f"{i+1}. {status} {task['task']}\n"
+                due = task.get("due", "未設定")
+                reply += f"{i+1}. {status} {task['task']}({due})\n"
         else:
             reply = "目前沒有任何作業。"
+
 
     else:
         reply = "請使用以下指令：\n1. 新增作業 作業內容\n2. 完成作業 編號\n3. 查看作業"
