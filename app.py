@@ -366,7 +366,7 @@ def handle_message(event):
                                 "label": "📝 手動選擇清除",
                                 "data": "clear_completed_select"
                             },
-                            "style": "secondary"
+                            "style": "primary"
                         },
                         {
                             "type": "button",
@@ -375,7 +375,8 @@ def handle_message(event):
                                 "label": "🧹 一鍵清除全部",
                                 "data": "clear_completed_all"
                             },
-                            "style": "primary"
+                            "style": "primary",
+                            "color": "#FF4444"  # 紅色
                         }
                     ]
                 }
@@ -679,22 +680,41 @@ def handle_postback(event):
                 )
             return
 
-    elif data.startswith("delete_expired_"):
-        index = int(data.replace("delete_expired_", ""))
+    elif data == "clear_completed_all":
+        tasks = load_data(user_id)
+        original_len = len(tasks)
+        new_data = [task for task in tasks if not task.get("done", False)]
+        removed = original_len - len(new_data)
+        save_data(new_data, user_id)
+
+        if removed > 0:
+            message = f"🧹 已清除 {removed} 筆已完成的作業。"
+        else:
+            message = "✅ 沒有已完成的作業需要清除。"
+
+    elif data == "clear_expired_all":
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
         tasks = load_data(user_id)
-        due_str = tasks[index].get("due", "")
-        try:
-            if not tasks[index].get("done") and due_str != "未設定" and \
-               datetime.datetime.strptime(due_str, "%Y-%m-%d").date() < now:
-                task_name = tasks[index]["task"]
-                del tasks[index]
-                save_data(tasks, user_id)
-                message = f"🗑️ 已刪除：{task_name}"
-            else:
-                message = "⚠️ 此作業尚未過期或已完成，無法刪除。"
-        except:
-            message = "⚠️ 操作錯誤，請稍後再試。"
+        original_len = len(tasks)
+        new_data = []
+        for task in tasks:
+            due = task.get("due", "未設定")
+            if task.get("done", False) or due == "未設定":
+                new_data.append(task)
+                continue
+            try:
+                if datetime.datetime.strptime(due, "%Y-%m-%d").date() >= now:
+                    new_data.append(task)
+            except:
+                new_data.append(task)
+
+        removed = original_len - len(new_data)
+        save_data(new_data, user_id)
+
+        if removed > 0:
+            message = f"🗑️ 已清除 {removed} 筆已截止的作業。"
+        else:
+            message = "✅ 沒有需要清除的已截止作業。"
     
     elif data == "select_remind_time":
         selected_time = params.get("time")  # 格式為 HH:MM
