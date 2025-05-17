@@ -91,8 +91,8 @@ def remind():
             # 計算現在時間與提醒時間的差距（秒數）
             diff_sec = abs((now - remind_datetime).total_seconds())
 
-            # 若差距超過 120 秒，就跳過
-            if diff_sec > 120:
+            # 若差距超過 300 秒，就跳過
+            if diff_sec > 300:
                 continue
         except Exception as e:
             print(f"[remind] 使用者 {user_id} 的提醒時間格式錯誤：{remind_time}")
