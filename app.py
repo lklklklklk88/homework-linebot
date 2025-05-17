@@ -345,14 +345,16 @@ def handle_message(event):
                         "style": "secondary"
                     },
                     {
-                    "type": "button",
-                    "action": {
-                        "type": "message",
-                        "label": "🧹 清除已完成作業",
-                        "text": "清除已完成作業"
-                    },
-                    "style": "destructive"
+                        "type": "button",
+                        "action": {
+                            "type": "message",
+                            "label": "🧹 清除已完成作業",
+                            "text": "清除已完成作業"
+                        },
+                        "style": "secondary",
+                        "color": "#FF3B30"  # ← 紅色
                     }
+
                 ]
             }
         }
