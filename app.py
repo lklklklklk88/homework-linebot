@@ -288,10 +288,27 @@ def handle_message(event):
     elif text == "查看作業":
         if data:
             reply = "📋 你的作業清單：\n"
+            now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
+
             for i, task in enumerate(data):
-                status = "✅" if task["done"] else "❌"
+                done = task.get("done", False)
                 due = task.get("due", "未設定")
-                reply += f"{i+1}. {status} {task['task']}({due})\n"
+                symbol = "✅" if done else "🔲"
+                label = ""
+
+                if not done and due != "未設定":
+                    try:
+                        due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
+                        if due_date < now:
+                            symbol = "❌"
+                        elif due_date == now:
+                            label = "（🔥 今天到期）"
+                        elif due_date == now + datetime.timedelta(days=1):
+                            label = "（⚠️ 明天到期）"
+                    except:
+                        pass
+
+                reply += f"{i+1}. {symbol} {task['task']}（{due}）{label}\n"
         else:
             reply = "目前沒有任何作業。"
 
@@ -350,7 +367,6 @@ def handle_message(event):
                         "style": "primary",
                         "color": "#FF3B30"  # ← 紅色
                     }
-
                 ]
             }
         }
