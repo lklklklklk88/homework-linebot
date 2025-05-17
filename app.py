@@ -16,7 +16,15 @@ from linebot.v3.messaging.models import TextMessage, ReplyMessageRequest
 from linebot.exceptions import InvalidSignatureError
 from linebot.v3.messaging.models import PushMessageRequest
 from linebot.v3.messaging.models import QuickReply, QuickReplyItem, MessageAction
-from linebot.v3.messaging.models import FlexMessage
+from linebot.v3.messaging.models import (
+    FlexMessage,
+    BubbleContainer,
+    BoxComponent,
+    TextComponent,
+    ButtonComponent,
+    SeparatorComponent,
+    MessageAction
+)
 
 app = Flask(__name__)
 
@@ -203,61 +211,27 @@ def handle_message(event):
     elif text == "選單":
         flex_message = FlexMessage(
             alt_text="操作選單",
-            contents={
-                "type": "bubble",
-                "body": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "contents": [
-                        {
-                            "type": "text",
-                            "text": "🛠 功能選單",
-                            "weight": "bold",
-                            "size": "xl",
-                            "margin": "md"
-                        },
-                        {
-                            "type": "separator",
-                            "margin": "md"
-                        },
-                        {
-                            "type": "box",
-                            "layout": "vertical",
-                            "spacing": "md",
-                            "margin": "md",
-                            "contents": [
-                                {
-                                    "type": "button",
-                                    "style": "primary",
-                                    "action": {
-                                        "type": "message",
-                                        "label": "➕ 新增作業",
-                                        "text": "新增作業"
-                                    }
-                                },
-                                {
-                                    "type": "button",
-                                    "style": "primary",
-                                    "action": {
-                                        "type": "message",
-                                        "label": "📋 查看作業",
-                                        "text": "查看作業"
-                                    }
-                                },
-                                {
-                                    "type": "button",
-                                    "style": "primary",
-                                    "action": {
-                                        "type": "message",
-                                        "label": "⏰ 設定提醒時間",
-                                        "text": "提醒時間"
-                                    }
-                                }
-                            ]
-                        }
+            contents=BubbleContainer(
+                body=BoxComponent(
+                    layout="vertical",
+                    contents=[
+                        TextComponent(text="🛠 功能選單", weight="bold", size="xl"),
+                        SeparatorComponent(),
+                        ButtonComponent(
+                            action=MessageAction(label="➕ 新增作業", text="新增作業"),
+                            style="primary"
+                        ),
+                        ButtonComponent(
+                            action=MessageAction(label="📋 查看作業", text="查看作業"),
+                            style="primary"
+                        ),
+                        ButtonComponent(
+                            action=MessageAction(label="⏰ 設定提醒時間", text="提醒時間"),
+                            style="primary"
+                        )
                     ]
-                }
-            }
+                )
+            )
         )
 
         with ApiClient(configuration) as api_client:
