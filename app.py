@@ -209,11 +209,42 @@ def handle_message(event):
                     "type": "box",
                     "layout": "vertical",
                     "contents": [
-                        {"type": "text", "text": "🛠 功能選單", "weight": "bold", "size": "lg"},
-                        {"type": "text", "text": "請選擇你要執行的操作：", "size": "sm", "margin": "md"},
-                        {"type": "button", "action": {"type": "message", "label": "➕ 新增作業", "text": "新增作業"}},
-                        {"type": "button", "action": {"type": "message", "label": "📋 查看作業", "text": "查看作業"}},
-                        {"type": "button", "action": {"type": "message", "label": "⏰ 設定提醒時間", "text": "提醒時間"}}
+                        {
+                            "type": "text",
+                            "text": "🛠 功能選單",
+                            "weight": "bold",
+                            "size": "lg"
+                        },
+                        {
+                            "type": "text",
+                            "text": "請選擇你要執行的操作：",
+                            "size": "sm",
+                            "margin": "md"
+                        },
+                        {
+                            "type": "button",
+                            "action": {
+                                "type": "message",
+                                "label": "➕ 新增作業",
+                                "text": "新增作業"
+                            }
+                        },
+                        {
+                            "type": "button",
+                            "action": {
+                                "type": "message",
+                                "label": "📋 查看作業",
+                                "text": "查看作業"
+                            }
+                        },
+                        {
+                            "type": "button",
+                            "action": {
+                                "type": "message",
+                                "label": "⏰ 設定提醒時間",
+                                "text": "提醒時間"
+                            }
+                        }
                     ]
                 }
             }
@@ -224,7 +255,7 @@ def handle_message(event):
             messaging_api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[flex_message]  # ✅ 現在正確是 FlexMessage 物件
+                    messages=[flex_message]
                 )
             )
         return
