@@ -16,6 +16,8 @@ from linebot.v3.messaging.models import TextMessage, ReplyMessageRequest
 from linebot.exceptions import InvalidSignatureError
 from linebot.v3.messaging.models import PushMessageRequest
 from linebot.v3.messaging.models import FlexMessage, FlexContainer
+from linebot.v3.webhook import PostbackEvent
+
 
 app = Flask(__name__)
 
@@ -58,6 +60,23 @@ def load_data(user_id):
 def save_data(data, user_id):
     ref = db.reference(f"users/{user_id}/tasks")
     ref.set(data)
+def set_user_state(user_id, state):
+    db.reference(f"users/{user_id}/state").set(state)
+
+def get_user_state(user_id):
+    return db.reference(f"users/{user_id}/state").get()
+
+def clear_user_state(user_id):
+    db.reference(f"users/{user_id}/state").delete()
+
+def set_temp_task(user_id, task):
+    db.reference(f"users/{user_id}/temp_task").set(task)
+
+def get_temp_task(user_id):
+    return db.reference(f"users/{user_id}/temp_task").get() or {}
+
+def clear_temp_task(user_id):
+    db.reference(f"users/{user_id}/temp_task").delete()
 
 @app.route("/")
 def home():
@@ -147,18 +166,9 @@ def handle_message(event):
     text = event.message.text.strip()
     data = load_data(user_id)
 
-    if text.startswith("新增作業"):
-        content = text.replace("新增作業", "").strip()
-        parts = content.rsplit(" ", 1)  # 嘗試把最後一個當作日期處理
-        if len(parts) == 2:
-            task, due = parts
-        else:
-            task = parts[0]
-            due = "未設定"
-        data.append({"task": task.strip(), "due": due.strip(), "done": False})
-        save_data(data, user_id)
-        reply = f"已新增作業：{task.strip()}（截止日：{due.strip()})"
-
+    if text == "新增作業":
+        set_user_state(user_id, "awaiting_task_name")
+        reply = "請輸入作業名稱："
 
     elif text.startswith("完成作業"):
         try:
@@ -199,7 +209,11 @@ def handle_message(event):
         except ValueError:
             reply = "請輸入正確格式，例如：提醒時間 08:30"
 
-    elif text == "選單":
+    elif get_user_state(user_id) == "awaiting_task_name":
+        task_name = text
+        set_temp_task(user_id, {"task": task_name})
+        set_user_state(user_id, "awaiting_due_date")
+
         bubble = {
             "type": "bubble",
             "body": {
@@ -207,25 +221,25 @@ def handle_message(event):
                 "layout": "vertical",
                 "spacing": "md",
                 "contents": [
-                    {"type": "text", "text": "請選擇操作", "weight": "bold", "size": "lg"},
+                    {"type": "text", "text": f"作業名稱：{task_name}", "weight": "bold", "size": "md"},
+                    {"type": "text", "text": "請選擇截止日期：", "size": "sm", "color": "#888888"},
                     {
                         "type": "button",
-                        "action": {"type": "message", "label": "➕ 新增作業", "text": "新增作業"},
+                        "action": {
+                            "type": "datetimepicker",
+                            "label": "📅 選擇日期",
+                            "data": "select_due_date",
+                            "mode": "date"
+                        },
                         "style": "primary"
                     },
                     {
                         "type": "button",
-                        "action": {"type": "message", "label": "✅ 完成作業", "text": "完成作業"},
-                        "style": "secondary"
-                    },
-                    {
-                        "type": "button",
-                        "action": {"type": "message", "label": "⏰ 提醒時間", "text": "提醒時間"},
-                        "style": "secondary"
-                    },
-                    {
-                        "type": "button",
-                        "action": {"type": "message", "label": "📋 查看作業", "text": "查看作業"},
+                        "action": {
+                            "type": "postback",
+                            "label": "🚫 不設定截止日",
+                            "data": "no_due_date"
+                        },
                         "style": "secondary"
                     }
                 ]
@@ -233,16 +247,13 @@ def handle_message(event):
         }
 
         with ApiClient(configuration) as api_client:
-            messaging_api = MessagingApi(api_client)
-            messaging_api.reply_message(
+            MessagingApi(api_client).reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[
-                        FlexMessage(
-                            alt_text="選單",
-                            contents=FlexContainer.from_dict(bubble)
-                        )
-                    ]
+                    messages=[FlexMessage(
+                        alt_text="選擇截止日期",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
                 )
             )
         return
@@ -258,6 +269,53 @@ def handle_message(event):
                 messages=[TextMessage(text=reply)]
             )
         )
+
+@handler.add(PostbackEvent)
+def handle_postback(event):
+    user_id = event.source.user_id
+    data = event.postback.data
+    params = event.postback.params
+
+    if data == "select_due_date":
+        selected_date = params.get("date")
+        task = get_temp_task(user_id)
+        if task:
+            task["due"] = selected_date
+            task["done"] = False
+            data_list = load_data(user_id)
+            data_list.append(task)
+            save_data(data_list, user_id)
+            clear_user_state(user_id)
+            clear_temp_task(user_id)
+            message = f"✅ 已新增作業：{task['task']}（截止日：{selected_date}）"
+        else:
+            message = "⚠️ 找不到暫存作業，請重新新增。"
+
+    elif data == "no_due_date":
+        task = get_temp_task(user_id)
+        if task:
+            task["due"] = "未設定"
+            task["done"] = False
+            data_list = load_data(user_id)
+            data_list.append(task)
+            save_data(data_list, user_id)
+            clear_user_state(user_id)
+            clear_temp_task(user_id)
+            message = f"✅ 已新增作業：{task['task']}（未設定截止日）"
+        else:
+            message = "⚠️ 找不到暫存作業，請重新新增。"
+
+    else:
+        message = "⚠️ 無法識別的操作。"
+
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=message)]
+            )
+        )
+
 
 if __name__ == "__main__":
     app.run()
