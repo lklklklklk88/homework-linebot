@@ -16,6 +16,7 @@ from linebot.v3.messaging.models import TextMessage, ReplyMessageRequest
 from linebot.exceptions import InvalidSignatureError
 from linebot.v3.messaging.models import PushMessageRequest
 from linebot.v3.messaging.models import QuickReply, QuickReplyItem, MessageAction
+from linebot.v3.messaging.models import FlexMessage
 
 app = Flask(__name__)
 
@@ -200,10 +201,9 @@ def handle_message(event):
             reply = "請輸入正確格式，例如：提醒時間 08:30"
 
     elif text == "選單":
-        flex_message = {
-            "type": "flex",
-            "altText": "操作選單",
-            "contents": {
+        flex_message = FlexMessage(
+            alt_text="操作選單",
+            contents={
                 "type": "bubble",
                 "body": {
                     "type": "box",
@@ -217,14 +217,14 @@ def handle_message(event):
                     ]
                 }
             }
-        }
+        )
 
         with ApiClient(configuration) as api_client:
             messaging_api = MessagingApi(api_client)
             messaging_api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[flex_message]
+                    messages=[flex_message]  # ✅ 現在正確是 FlexMessage 物件
                 )
             )
         return
