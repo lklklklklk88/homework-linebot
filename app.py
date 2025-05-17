@@ -367,6 +367,47 @@ def handle_message(event):
                 )
             )
         return
+    
+    elif text == "清除已截止作業":
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
+
+        original_len = len(data)
+        new_data = []
+        removed_count = 0
+
+        for task in data:
+            due = task.get("due", "未設定")
+            done = task.get("done", False)
+
+            # 保留以下情況：已完成、未設定日期、未過期
+            if done or due == "未設定":
+                new_data.append(task)
+                continue
+
+            try:
+                due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
+                if due_date >= now:
+                    new_data.append(task)
+                else:
+                    removed_count += 1
+            except:
+                new_data.append(task)
+
+        save_data(new_data, user_id)
+
+        if removed_count > 0:
+            reply = f"🗑️ 已清除 {removed_count} 筆已截止且未完成的作業。"
+        else:
+            reply = "✅ 沒有需要清除的已截止作業。"
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=reply)]
+                )
+            )
+        return
 
     elif text == "選單":
         bubble = {
@@ -402,7 +443,14 @@ def handle_message(event):
                         "action": {"type": "message", "label": "🧹 清除已完成作業", "text": "清除已完成作業"},
                         "style": "primary",
                         "color": "#FF3B30"  # ← 紅色
+                    },
+                    {
+                        "type": "button",
+                        "action": {"type": "message", "label": "🗑️ 清除已截止作業", "text": "清除已截止作業"},
+                        "style": "primary",
+                        "color": "#FF3B30"
                     }
+
                 ]
             }
         }
@@ -504,7 +552,6 @@ def handle_postback(event):
                 messages=[TextMessage(text=message)]
             )
         )
-
 
 if __name__ == "__main__":
     app.run()
