@@ -213,37 +213,47 @@ def handle_message(event):
                             "type": "text",
                             "text": "🛠 功能選單",
                             "weight": "bold",
-                            "size": "lg"
-                        },
-                        {
-                            "type": "text",
-                            "text": "請選擇你要執行的操作：",
-                            "size": "sm",
+                            "size": "xl",
                             "margin": "md"
                         },
                         {
-                            "type": "button",
-                            "action": {
-                                "type": "message",
-                                "label": "➕ 新增作業",
-                                "text": "新增作業"
-                            }
+                            "type": "separator",
+                            "margin": "md"
                         },
                         {
-                            "type": "button",
-                            "action": {
-                                "type": "message",
-                                "label": "📋 查看作業",
-                                "text": "查看作業"
-                            }
-                        },
-                        {
-                            "type": "button",
-                            "action": {
-                                "type": "message",
-                                "label": "⏰ 設定提醒時間",
-                                "text": "提醒時間"
-                            }
+                            "type": "box",
+                            "layout": "vertical",
+                            "spacing": "md",
+                            "margin": "md",
+                            "contents": [
+                                {
+                                    "type": "button",
+                                    "style": "primary",
+                                    "action": {
+                                        "type": "message",
+                                        "label": "➕ 新增作業",
+                                        "text": "新增作業"
+                                    }
+                                },
+                                {
+                                    "type": "button",
+                                    "style": "primary",
+                                    "action": {
+                                        "type": "message",
+                                        "label": "📋 查看作業",
+                                        "text": "查看作業"
+                                    }
+                                },
+                                {
+                                    "type": "button",
+                                    "style": "primary",
+                                    "action": {
+                                        "type": "message",
+                                        "label": "⏰ 設定提醒時間",
+                                        "text": "提醒時間"
+                                    }
+                                }
+                            ]
                         }
                     ]
                 }
@@ -260,6 +270,7 @@ def handle_message(event):
             )
         return
 
+
     else:
         reply = "請使用以下指令：\n1. 新增作業 作業內容\n2. 完成作業 編號\n3. 查看作業"
 
@@ -274,10 +285,10 @@ def handle_message(event):
                     QuickReplyItem(action=MessageAction(label="新增作業", text="新增作業")),
                     QuickReplyItem(action=MessageAction(label="查看作業", text="查看作業")),
                     QuickReplyItem(action=MessageAction(label="選單", text="選單"))
-    ])
-)]
-            )
-        )
+            ])
+        )]
+    )
+)
 
 if __name__ == "__main__":
     app.run()
