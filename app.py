@@ -14,6 +14,7 @@ from linebot.v3.webhook import WebhookHandler, MessageEvent
 from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
 from linebot.v3.messaging.models import TextMessage, ReplyMessageRequest
 from linebot.exceptions import InvalidSignatureError
+from linebot.v3.messaging.models import PushMessageRequest
 
 app = Flask(__name__)
 
@@ -119,7 +120,16 @@ def remind():
                 message += f"🔸 {task['task']} {highlight}\n"
 
         if has_task:
-            line_bot_api.push_message(user_id, TextMessage(text=message))
+            try:
+                line_bot_api.push_message(
+                    PushMessageRequest(
+                        to=user_id,
+                        messages=[TextMessage(text=message)]
+                    )
+                )
+                print(f"[remind] 已推送提醒給 {user_id}")
+            except Exception as e:
+                print(f"[remind] 推送失敗給 {user_id}：{e}")
     return "OK"
 
 
