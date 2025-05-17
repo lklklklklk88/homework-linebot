@@ -15,16 +15,6 @@ from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
 from linebot.v3.messaging.models import TextMessage, ReplyMessageRequest
 from linebot.exceptions import InvalidSignatureError
 from linebot.v3.messaging.models import PushMessageRequest
-from linebot.v3.messaging.models import QuickReply, QuickReplyItem, MessageAction
-from linebot.v3.messaging.models import (
-    FlexMessage,
-    BubbleContainer,
-    BoxComponent,
-    TextComponent,
-    ButtonComponent,
-    SeparatorComponent,
-    MessageAction
-)
 
 app = Flask(__name__)
 
@@ -209,37 +199,48 @@ def handle_message(event):
             reply = "請輸入正確格式，例如：提醒時間 08:30"
 
     elif text == "選單":
-        flex_message = FlexMessage(
-            alt_text="操作選單",
-            contents=BubbleContainer(
-                body=BoxComponent(
-                    layout="vertical",
-                    contents=[
-                        TextComponent(text="🛠 功能選單", weight="bold", size="xl"),
-                        SeparatorComponent(),
-                        ButtonComponent(
-                            action=MessageAction(label="➕ 新增作業", text="新增作業"),
-                            style="primary"
-                        ),
-                        ButtonComponent(
-                            action=MessageAction(label="📋 查看作業", text="查看作業"),
-                            style="primary"
-                        ),
-                        ButtonComponent(
-                            action=MessageAction(label="⏰ 設定提醒時間", text="提醒時間"),
-                            style="primary"
-                        )
-                    ]
-                )
-            )
-        )
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {"type": "text", "text": "請選擇操作", "weight": "bold", "size": "lg"},
+                    {
+                        "type": "button",
+                        "action": {"type": "message", "label": "➕ 新增作業", "text": "新增作業"},
+                        "style": "primary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {"type": "message", "label": "✅ 完成作業", "text": "完成作業"},
+                        "style": "secondary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {"type": "message", "label": "⏰ 提醒時間", "text": "提醒時間"},
+                        "style": "secondary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {"type": "message", "label": "📋 查看作業", "text": "查看作業"},
+                        "style": "secondary"
+                    }
+                ]
+            }
+        }
 
         with ApiClient(configuration) as api_client:
             messaging_api = MessagingApi(api_client)
             messaging_api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[flex_message]
+                    messages=[{
+                        "type": "flex",
+                        "altText": "選單",
+                        "contents": bubble
+                    }]
                 )
             )
         return
@@ -252,16 +253,9 @@ def handle_message(event):
         messaging_api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(
-                text=reply,
-                quick_reply=QuickReply(items=[
-                    QuickReplyItem(action=MessageAction(label="新增作業", text="新增作業")),
-                    QuickReplyItem(action=MessageAction(label="查看作業", text="查看作業")),
-                    QuickReplyItem(action=MessageAction(label="選單", text="選單"))
-            ])
-        )]
-    )
-)
+                messages=[TextMessage(text=reply)]
+            )
+        )
 
 if __name__ == "__main__":
     app.run()
