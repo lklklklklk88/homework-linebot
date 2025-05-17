@@ -18,6 +18,7 @@ from linebot.v3.messaging.models import PushMessageRequest
 from linebot.v3.messaging.models import FlexMessage, FlexContainer
 from linebot.v3.webhooks import PostbackEvent
 
+
 app = Flask(__name__)
 
 # 載入 .env 環境變數
@@ -169,45 +170,6 @@ def handle_message(event):
         set_user_state(user_id, "awaiting_task_name")
         reply = "請輸入作業名稱："
 
-    elif text.startswith("完成作業"):
-        try:
-            index = int(text.replace("完成作業", "").strip()) - 1
-            if 0 <= index < len(data):
-                removed_task = data.pop(index)  # ✅ 刪除指定作業
-                save_data(data, user_id)
-                reply = f"已完成作業：{removed_task['task']}"
-            else:
-                reply = "作業編號無效。請輸入正確的編號。"
-        except ValueError:
-            reply = "請輸入正確格式，例如：完成作業 2"
-
-
-    elif text == "查看作業":
-        if data:
-            reply = "📋 你的作業清單：\n"
-            for i, task in enumerate(data):
-                status = "✅" if task["done"] else "🔲"
-                due = task.get("due", "未設定")
-                reply += f"{i+1}. {status} {task['task']}({due})\n"
-        else:
-            reply = "目前沒有任何作業。"
-
-    elif text.startswith("提醒時間"):
-        time_str = text.replace("提醒時間", "").strip()
-        try:
-            datetime.datetime.strptime(time_str, "%H:%M")
-            db.reference(f"users/{user_id}/remind_time").set(time_str)
-
-            # ✅ 這段是重點：把 reminded 清掉
-            tasks = load_data(user_id)
-            for task in tasks:
-                task["reminded"] = False
-            save_data(tasks, user_id)
-
-            reply = f"提醒時間已設定為：{time_str}（提醒狀態已重置）"
-        except ValueError:
-            reply = "請輸入正確格式，例如：提醒時間 08:30"
-
     elif get_user_state(user_id) == "awaiting_task_name":
         task_name = text
         set_temp_task(user_id, {"task": task_name})
@@ -257,6 +219,93 @@ def handle_message(event):
             )
         return
 
+    elif text.startswith("完成作業"):
+        try:
+            index = int(text.replace("完成作業", "").strip()) - 1
+            if 0 <= index < len(data):
+                removed_task = data.pop(index)  # ✅ 刪除指定作業
+                save_data(data, user_id)
+                reply = f"已完成作業：{removed_task['task']}"
+            else:
+                reply = "作業編號無效。請輸入正確的編號。"
+        except ValueError:
+            reply = "請輸入正確格式，例如：完成作業 2"
+
+
+    elif text == "查看作業":
+        if data:
+            reply = "📋 你的作業清單：\n"
+            for i, task in enumerate(data):
+                status = "✅" if task["done"] else "🔲"
+                due = task.get("due", "未設定")
+                reply += f"{i+1}. {status} {task['task']}({due})\n"
+        else:
+            reply = "目前沒有任何作業。"
+
+    elif text.startswith("提醒時間"):
+        time_str = text.replace("提醒時間", "").strip()
+        try:
+            datetime.datetime.strptime(time_str, "%H:%M")
+            db.reference(f"users/{user_id}/remind_time").set(time_str)
+
+            # ✅ 這段是重點：把 reminded 清掉
+            tasks = load_data(user_id)
+            for task in tasks:
+                task["reminded"] = False
+            save_data(tasks, user_id)
+
+            reply = f"提醒時間已設定為：{time_str}（提醒狀態已重置）"
+        except ValueError:
+            reply = "請輸入正確格式，例如：提醒時間 08:30"
+
+    elif text == "選單":
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {"type": "text", "text": "請選擇操作", "weight": "bold", "size": "lg"},
+                    {
+                        "type": "button",
+                        "action": {"type": "message", "label": "➕ 新增作業", "text": "新增作業"},
+                        "style": "primary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {"type": "message", "label": "✅ 完成作業", "text": "完成作業"},
+                        "style": "secondary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {"type": "message", "label": "⏰ 提醒時間", "text": "提醒時間"},
+                        "style": "secondary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {"type": "message", "label": "📋 查看作業", "text": "查看作業"},
+                        "style": "secondary"
+                    }
+                ]
+            }
+        }
+
+        with ApiClient(configuration) as api_client:
+            messaging_api = MessagingApi(api_client)
+            messaging_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[
+                        FlexMessage(
+                            alt_text="選單",
+                            contents=FlexContainer.from_dict(bubble)
+                        )
+                    ]
+                )
+            )
+        return
+
     else:
         reply = "請使用以下指令：\n1. 新增作業 作業內容\n2. 完成作業 編號\n3. 查看作業"
 
@@ -266,8 +315,8 @@ def handle_message(event):
             ReplyMessageRequest(
                 reply_token=event.reply_token,
                 messages=[TextMessage(text=reply)]
-            )
-        )
+    )
+)
 
 @handler.add(PostbackEvent)
 def handle_postback(event):
