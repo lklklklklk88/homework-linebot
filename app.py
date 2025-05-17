@@ -1,5 +1,6 @@
 import os
 import json
+import datetime
 import tempfile
 
 from flask import Flask, request, abort
@@ -24,6 +25,7 @@ LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
 
 configuration = Configuration(access_token=LINE_CHANNEL_ACCESS_TOKEN)
+line_bot_api = MessagingApi(ApiClient(configuration))
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # Firebase 初始化
@@ -71,6 +73,43 @@ def callback():
 
     return 'OK'
 
+@app.route("/remind", methods=["GET"])
+def remind():
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))  # 台灣時區
+    current_time_str = now.strftime("%H:%M")
+
+    users = db.reference("users").get()
+    for user_id, user_data in users.items():
+        tasks = user_data.get("tasks", [])
+        remind_time = user_data.get("remind_time", "08:00")
+        if remind_time != current_time_str:
+            continue
+
+        message = "📋 以下是你尚未完成的作業：\n"
+        has_task = False
+        for task in tasks:
+            if not task.get("done", False):
+                has_task = True
+                due_str = task.get("due", "")
+                highlight = ""
+
+                # 判斷是否為今天或明天到期
+                try:
+                    due_date = datetime.datetime.strptime(due_str, "%Y-%m-%d").date()
+                    if due_date == now.date():
+                        highlight = "（🔥 今天到期）"
+                    elif due_date == now.date() + datetime.timedelta(days=1):
+                        highlight = "（⚠️ 明天到期）"
+                except:
+                    pass
+
+                message += f"🔸 {task['task']} {highlight}\n"
+
+        if has_task:
+            line_bot_api.push_message(user_id, TextMessage(text=message))
+    return "OK"
+
+
 @handler.add(MessageEvent)
 def handle_message(event):
     user_id = event.source.user_id
@@ -117,6 +156,14 @@ def handle_message(event):
         else:
             reply = "目前沒有任何作業。"
 
+    elif text.startswith("提醒時間"):
+        time_str = text.replace("提醒時間", "").strip()
+        try:
+            datetime.datetime.strptime(time_str, "%H:%M")
+            db.reference(f"users/{user_id}/remind_time").set(time_str)
+            reply = f"提醒時間已設定為：{time_str}"
+        except ValueError:
+            reply = "請輸入正確格式，例如：提醒時間 08:30"
 
     else:
         reply = "請使用以下指令：\n1. 新增作業 作業內容\n2. 完成作業 編號\n3. 查看作業"
