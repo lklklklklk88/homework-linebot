@@ -346,12 +346,8 @@ def handle_message(event):
                     },
                     {
                         "type": "button",
-                        "action": {
-                            "type": "message",
-                            "label": "🧹 清除已完成作業",
-                            "text": "清除已完成作業"
-                        },
-                        "style": "secondary",
+                        "action": {"type": "message", "label": "🧹 清除已完成作業", "text": "清除已完成作業"},
+                        "style": "primary",
                         "color": "#FF3B30"  # ← 紅色
                     }
 
