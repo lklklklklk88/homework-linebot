@@ -269,21 +269,57 @@ def handle_message(event):
             )
         return
     
-    elif text.startswith("提醒時間"):
-        time_str = text.replace("提醒時間", "").strip()
-        try:
-            datetime.datetime.strptime(time_str, "%H:%M")
-            db.reference(f"users/{user_id}/remind_time").set(time_str)
+    elif text == "提醒時間":
+        # 取得目前使用者的提醒時間，預設為 08:00
+        current_time = db.reference(f"users/{user_id}/remind_time").get() or "08:00"
 
-            # ✅ 這段是重點：把 reminded 清掉
-            tasks = load_data(user_id)
-            for task in tasks:
-                task["reminded"] = False
-            save_data(tasks, user_id)
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": f"目前提醒時間：{current_time}",
+                        "weight": "bold",
+                        "size": "md"
+                    },
+                    {
+                        "type": "text",
+                        "text": "請選擇新的提醒時間：",
+                        "size": "sm",
+                        "color": "#888888"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "datetimepicker",
+                            "label": "⏰ 選擇時間",
+                            "data": "select_remind_time",
+                            "mode": "time",
+                            "initial": current_time,
+                            "max": "23:59",
+                            "min": "00:00"
+                        },
+                        "style": "primary"
+                    }
+                ]
+            }
+        }
 
-            reply = f"提醒時間已設定為：{time_str}（提醒狀態已重置）"
-        except ValueError:
-            reply = "請輸入正確格式，例如：提醒時間 08:30"
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[FlexMessage(
+                        alt_text="設定提醒時間",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                )
+            )
+        return
 
     elif text == "查看作業":
         if data:
@@ -445,7 +481,18 @@ def handle_postback(event):
                 message = "⚠️ 無法找到指定作業。"
         except:
             message = "⚠️ 操作錯誤，請稍後再試。"
+    
+    elif data == "select_remind_time":
+        selected_time = params.get("time")  # 格式為 HH:MM
+        db.reference(f"users/{user_id}/remind_time").set(selected_time)
 
+        # 清除所有作業的 reminded 標記
+        tasks = load_data(user_id)
+        for task in tasks:
+            task["reminded"] = False
+        save_data(tasks, user_id)
+
+        message = f"⏰ 提醒時間已設定為：{selected_time}（提醒狀態已重置）"
 
     else:
         message = "⚠️ 無法識別的操作。"
