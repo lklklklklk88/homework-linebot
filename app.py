@@ -15,9 +15,6 @@ from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
 from linebot.v3.messaging.models import TextMessage, ReplyMessageRequest
 from linebot.exceptions import InvalidSignatureError
 from linebot.v3.messaging.models import PushMessageRequest
-from linebot.v3.webhooks import PostbackEvent
-from linebot.v3.messaging.models import FlexMessage
-
 
 app = Flask(__name__)
 
@@ -76,40 +73,6 @@ def callback():
         abort(400)
 
     return 'OK'
-
-@handler.add(PostbackEvent)
-def handle_postback(event):
-    user_id = event.source.user_id
-    data = event.postback.data
-
-    if data.startswith("action=select_due"):
-        selected_date = event.postback.params.get("date")
-        session_ref = db.reference(f"users/{user_id}/session")
-        session = session_ref.get()
-
-        if session and session.get("task_name"):
-            task_name = session["task_name"]
-            task_data = load_data(user_id)
-            task_data.append({
-                "task": task_name,
-                "due": selected_date,
-                "done": False
-            })
-            save_data(task_data, user_id)
-            session_ref.delete()  # 清除暫存
-
-            reply = f"✅ 已新增作業：{task_name}（截止日：{selected_date}）"
-        else:
-            reply = "⚠️ 錯誤：找不到暫存的作業名稱，請重新新增作業。"
-
-        with ApiClient(configuration) as api_client:
-            messaging_api = MessagingApi(api_client)
-            messaging_api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=reply)]
-                )
-            )
 
 @app.route("/remind", methods=["GET"])
 def remind():
@@ -183,69 +146,18 @@ def handle_message(event):
     text = event.message.text.strip()
     data = load_data(user_id)
 
-# 🔹 新增作業按鈕觸發
-    if text == "新增作業":
-        session_ref = db.reference(f"users/{user_id}/session")
-        session_ref.set({"awaiting_task_name": True})  # 設定狀態
+    if text.startswith("新增作業"):
+        content = text.replace("新增作業", "").strip()
+        parts = content.rsplit(" ", 1)  # 嘗試把最後一個當作日期處理
+        if len(parts) == 2:
+            task, due = parts
+        else:
+            task = parts[0]
+            due = "未設定"
+        data.append({"task": task.strip(), "due": due.strip(), "done": False})
+        save_data(data, user_id)
+        reply = f"已新增作業：{task.strip()}（截止日：{due.strip()})"
 
-        flex_content = {
-            "type": "bubble",
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": "✏️ 請先傳送作業名稱（例如：離散作業一）",
-                        "wrap": True
-                    },
-                    {
-                        "type": "button",
-                        "action": {
-                            "type": "datetimepicker",
-                            "label": "📅 選擇截止日期",
-                            "data": "action=select_due",
-                            "mode": "date"
-                        }
-                    }
-                ]
-            }
-        }
-
-        flex_message = FlexMessage(
-            alt_text="新增作業",
-            contents=flex_content
-        )
-
-        with ApiClient(configuration) as api_client:
-            messaging_api = MessagingApi(api_client)
-            messaging_api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[flex_message]
-                )
-            )
-        return
-
-    session_ref = db.reference(f"users/{user_id}/session")
-    session = session_ref.get()
-    if session and session.get("awaiting_task_name"):
-        task_name = text
-        session_ref.set({
-            "task_name": task_name,
-            "awaiting_due_date": True
-        })
-        reply = f"已收到作業名稱：{task_name}\n請點選下方的日期來設定截止時間。"
-
-        with ApiClient(configuration) as api_client:
-            messaging_api = MessagingApi(api_client)
-            messaging_api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=reply)]
-                )
-            )
-        return
 
     elif text.startswith("完成作業"):
         try:
@@ -285,6 +197,7 @@ def handle_message(event):
             reply = f"提醒時間已設定為：{time_str}（提醒狀態已重置）"
         except ValueError:
             reply = "請輸入正確格式，例如：提醒時間 08:30"
+
 
     else:
         reply = "請使用以下指令：\n1. 新增作業 作業內容\n2. 完成作業 編號\n3. 查看作業"
