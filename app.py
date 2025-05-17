@@ -319,31 +319,73 @@ def handle_message(event):
         return
 
     elif text == "查看作業":
-        if data:
-            reply = "📋 你的作業清單：\n"
-            now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
-
-            for i, task in enumerate(data):
-                done = task.get("done", False)
-                due = task.get("due", "未設定")
-                symbol = "✅" if done else "🔲"
-                label = ""
-
-                if not done and due != "未設定":
-                    try:
-                        due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
-                        if due_date < now:
-                            symbol = "❌"
-                        elif due_date == now:
-                            label = "（🔥 今天到期）"
-                        elif due_date == now + datetime.timedelta(days=1):
-                            label = "（⚠️ 明天到期）"
-                    except:
-                        pass
-
-                reply += f"{i+1}. {symbol} {task['task']}（{due}）{label}\n"
-        else:
+        if not data:
             reply = "目前沒有任何作業。"
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text=reply)]
+                    )
+                )
+            return
+
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
+        rows = []
+
+        for i, task in enumerate(data):
+            done = task.get("done", False)
+            due = task.get("due", "未設定")
+            symbol = "✅" if done else "🔲"
+            label = ""
+
+            if not done and due != "未設定":
+                try:
+                    due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
+                    if due_date < now:
+                        symbol = "❌"
+                    elif due_date == now:
+                        label = "（🔥 今天到期）"
+                    elif due_date == now + datetime.timedelta(days=1):
+                        label = "（⚠️ 明天到期）"
+                except:
+                    pass
+
+            rows.append({
+                "type": "box",
+                "layout": "horizontal",
+                "contents": [
+                    {"type": "text", "text": f"{i+1}.", "size": "sm", "flex": 1},
+                    {"type": "text", "text": f"{symbol} {task['task']}", "size": "sm", "flex": 4},
+                    {"type": "text", "text": f"{due}{label}", "size": "sm", "flex": 5, "wrap": True}
+                ]
+            })
+
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": [
+                    {"type": "text", "text": "📋 你的作業清單：", "weight": "bold", "size": "md"},
+                    {"type": "separator"},
+                    *rows
+                ]
+            }
+        }
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[FlexMessage(
+                        alt_text="作業清單",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                )
+            )
+        return
 
     elif text == "清除已完成作業":
         completed_tasks = [task for task in data if task.get("done", False)]
