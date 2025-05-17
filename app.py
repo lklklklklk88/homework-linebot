@@ -15,6 +15,7 @@ from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
 from linebot.v3.messaging.models import TextMessage, ReplyMessageRequest
 from linebot.exceptions import InvalidSignatureError
 from linebot.v3.messaging.models import PushMessageRequest
+from linebot.v3.messaging.models import FlexMessage
 
 app = Flask(__name__)
 
@@ -236,11 +237,12 @@ def handle_message(event):
             messaging_api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[{
-                        "type": "flex",
-                        "altText": "選單",
-                        "contents": bubble
-                    }]
+                    messages=[
+                        FlexMessage(
+                            alt_text="選單",
+                            contents=bubble
+                        )
+                    ]
                 )
             )
         return
