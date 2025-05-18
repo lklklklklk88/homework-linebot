@@ -6,7 +6,7 @@ from firebase_utils import (
 )
 from firebase_admin import db
 
-from linebot.v3.webhook import PostbackEvent
+from linebot.v3.webhooks import PostbackEvent
 from linebot.v3.messaging import MessagingApi, ReplyMessageRequest
 from linebot.v3.messaging.models import TextMessage, FlexMessage, FlexContainer
 from linebot.v3.messaging import ApiClient
