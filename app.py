@@ -257,15 +257,14 @@ def handle_message(event):
     data = load_data(user_id)
 
     if text == "新增作業":
-        set_user_state(user_id, "awaiting_task_name")
-        reply = "請輸入作業名稱："
-
-    elif get_user_state(user_id) == "awaiting_task_name":
-        task_name = text
-        set_temp_task(user_id, {"task": task_name})
-        set_user_state(user_id, "awaiting_estimated_time")
-
-        reply = f"📝 作業名稱為「{task_name}」，請輸入預估完成時間（單位：小時，例如 2 或 1.5）："
+        set_user_state(user_id, "awaiting_full_task_input")
+        reply = (
+            "請輸入作業內容，格式為：\n"
+            "作業名稱 預估時間(小時) 類型\n\n"
+            "📌 例如：\n"
+            "英文報告 1.5 閱讀\n"
+            "歷史小論文 2.5 寫作"
+        )
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
                 ReplyMessageRequest(
@@ -275,70 +274,14 @@ def handle_message(event):
             )
         return
     
-    elif get_user_state(user_id) == "awaiting_category_text":
-        category = text.strip()
-        task = get_temp_task(user_id)
-        task["category"] = category
-        set_temp_task(user_id, task)
-        set_user_state(user_id, "awaiting_due_date")
-
-        # 這裡呼叫你原本的選擇截止日 bubble
-        bubble = {
-            "type": "bubble",
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "spacing": "md",
-                "contents": [
-                    {"type": "text", "text": f"作業名稱：{task['task']}", "weight": "bold", "size": "md"},
-                    {"type": "text", "text": "請選擇截止日期：", "size": "sm", "color": "#888888"},
-                    {
-                        "type": "button",
-                        "action": {
-                            "type": "datetimepicker",
-                            "label": "📅 選擇日期",
-                            "data": "select_due_date",
-                            "mode": "date"
-                        },
-                        "style": "primary"
-                    },
-                    {
-                        "type": "button",
-                        "action": {
-                            "type": "postback",
-                            "label": "🚫 不設定截止日",
-                            "data": "no_due_date"
-                        },
-                        "style": "secondary"
-                    }
-                ]
-            }
-        }
-
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[FlexMessage(
-                        alt_text="選擇截止日期",
-                        contents=FlexContainer.from_dict(bubble)
-                    )]
-                )
+    elif get_user_state(user_id) == "awaiting_full_task_input":
+        parts = text.strip().split()
+        if len(parts) < 3:
+            reply = (
+                "⚠️ 格式錯誤，請輸入完整內容：\n"
+                "作業名稱 預估時間(小時) 類型\n"
+                "📌 範例：英文報告 1.5 閱讀"
             )
-        return
-    
-    elif get_user_state(user_id) == "awaiting_estimated_time":
-        try:
-            estimated_time = float(text)
-            if estimated_time <= 0:
-                raise ValueError
-
-            task = get_temp_task(user_id)
-            task["estimated_time"] = estimated_time
-            set_temp_task(user_id, task)
-            set_user_state(user_id, "awaiting_category_text")  # 新增狀態：請輸入分類
-
-            reply = "請輸入這份作業的類型（例如：報告、背單字、寫程式、簡報⋯⋯）"
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
                     ReplyMessageRequest(
@@ -347,8 +290,71 @@ def handle_message(event):
                     )
                 )
             return
+        try:
+            # 拆解格式
+            task_name = " ".join(parts[:-2])
+            estimated_time = float(parts[-2])
+            category = parts[-1]
+
+            task = {
+                "task": task_name,
+                "estimated_time": estimated_time,
+                "category": category
+            }
+            set_temp_task(user_id, task)
+            set_user_state(user_id, "awaiting_due_date")
+
+            # 回覆日期選擇 UI
+            bubble = {
+                "type": "bubble",
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "md",
+                    "contents": [
+                        {"type": "text", "text": f"作業名稱：{task_name}", "weight": "bold", "size": "md"},
+                        {"type": "text", "text": "請選擇截止日期：", "size": "sm", "color": "#888888"},
+                        {
+                            "type": "button",
+                            "action": {
+                                "type": "datetimepicker",
+                                "label": "📅 選擇日期",
+                                "data": "select_due_date",
+                                "mode": "date"
+                            },
+                            "style": "primary"
+                        },
+                        {
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": "🚫 不設定截止日",
+                                "data": "no_due_date"
+                            },
+                            "style": "secondary"
+                        }
+                    ]
+                }
+            }
+
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[FlexMessage(
+                            alt_text="選擇截止日期",
+                            contents=FlexContainer.from_dict(bubble)
+                        )]
+                    )
+                )
+            return
+
         except:
-            reply = "⚠️ 請輸入有效的時間（以小時為單位，例如 1.5）"
+            reply = (
+                "⚠️ 預估時間格式錯誤，請再試一次！\n"
+                "格式應為：名稱 預估時間 類型\n"
+                "📌 範例：英文報告 1.5 閱讀"
+            )
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
                     ReplyMessageRequest(
