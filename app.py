@@ -308,6 +308,7 @@ def handle_message(event):
                 )
             )
         return
+    
     elif get_user_state(user_id) == "awaiting_estimated_time":
         try:
             estimated_time = float(text)
@@ -366,57 +367,6 @@ def handle_message(event):
                     )
                 )
             return
-
-    elif data.startswith("category_"):
-        category = data.replace("category_", "")
-        task = get_temp_task(user_id)
-        task["category"] = category
-        set_temp_task(user_id, task)
-        set_user_state(user_id, "awaiting_due_date")
-
-        bubble = {
-            "type": "bubble",
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "spacing": "md",
-                "contents": [
-                    {"type": "text", "text": f"作業名稱：{task['task']}", "weight": "bold", "size": "md"},
-                    {"type": "text", "text": "請選擇截止日期：", "size": "sm", "color": "#888888"},
-                    {
-                        "type": "button",
-                        "action": {
-                            "type": "datetimepicker",
-                            "label": "📅 選擇日期",
-                            "data": "select_due_date",
-                            "mode": "date"
-                        },
-                        "style": "primary"
-                    },
-                    {
-                        "type": "button",
-                        "action": {
-                            "type": "postback",
-                            "label": "🚫 不設定截止日",
-                            "data": "no_due_date"
-                        },
-                        "style": "secondary"
-                    }
-                ]
-            }
-        }
-
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[FlexMessage(
-                        alt_text="選擇截止日期",
-                        contents=FlexContainer.from_dict(bubble)
-                    )]
-                )
-            )
-        return
 
     elif text == "完成作業":
         if not data:
@@ -834,6 +784,57 @@ def handle_postback(event):
                 message = "⚠️ 無法找到指定作業。"
         except:
             message = "⚠️ 操作錯誤，請稍後再試。"
+    
+    elif data.startswith("category_"):
+        category = data.replace("category_", "")
+        task = get_temp_task(user_id)
+        task["category"] = category
+        set_temp_task(user_id, task)
+        set_user_state(user_id, "awaiting_due_date")
+
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {"type": "text", "text": f"作業名稱：{task['task']}", "weight": "bold", "size": "md"},
+                    {"type": "text", "text": "請選擇截止日期：", "size": "sm", "color": "#888888"},
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "datetimepicker",
+                            "label": "📅 選擇日期",
+                            "data": "select_due_date",
+                            "mode": "date"
+                        },
+                        "style": "primary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "🚫 不設定截止日",
+                            "data": "no_due_date"
+                        },
+                        "style": "secondary"
+                    }
+                ]
+            }
+        }
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[FlexMessage(
+                        alt_text="選擇截止日期",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                )
+            )
+        return
 
     elif data == "clear_completed_select":
         tasks = load_data(user_id)
