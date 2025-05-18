@@ -4,22 +4,25 @@ import datetime
 def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
     display_name = get_line_display_name(user_id)
 
-    # 取得目前時間（台灣時間）並進行「半點進位」
+    # 取得目前時間（台灣時間）並進行「半點後進位到下一個整點或半點」＋至少緩衝30分鐘
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-    minute = now.minute
-    if minute < 30:
-        rounded_minute = 30
-        start_hour = now.hour
+    total_minutes = now.hour * 60 + now.minute + 30  # 加上30分鐘緩衝
+    remainder = total_minutes % 60
+
+    if remainder < 30:
+        rounded_minutes = total_minutes - remainder + 30
     else:
-        rounded_minute = 0
-        start_hour = now.hour + 1
+        rounded_minutes = total_minutes - remainder + 60
+
+    start_hour = rounded_minutes // 60
+    start_minute = rounded_minutes % 60
 
     # 若結果是整點，則從整點開始；若是半點，則 +0.5
-    work_start = start_hour + (0.5 if rounded_minute == 30 else 0)
+    work_start = start_hour + (0.5 if start_minute == 30 else 0)
     work_end = 23
     available_hours = min(8, work_end - work_start)
 
-    start_str = f"{int(start_hour):02d}:{rounded_minute:02d}"
+    start_str = f"{int(start_hour):02d}:{start_minute:02d}"
 
     prompt = f"""
 你是一位擁有規劃能力與人性化口吻的任務助理，請協助 {display_name} 在 {today} 排出最佳工作計劃。
@@ -51,7 +54,10 @@ def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
 
 🕘 建議排程：從 {start_str} 起算，安排 {available_hours} 小時內完成
 
+---
+
 📎 建議：每工作 1 小時休息 5~10 分鐘；可用「完成作業」標記進度。
+    如果排程中有連續兩小時以上的任務，請記得在中間自行安排 5～10 分鐘的短暫休息 ☕️
 
 ---
 
