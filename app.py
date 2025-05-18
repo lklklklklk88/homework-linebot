@@ -3,11 +3,14 @@ import json
 import datetime
 import tempfile
 
+from scheduler import generate_gemini_prompt
 from flask import Flask, request, abort
 from dotenv import load_dotenv
 
 import firebase_admin
 from firebase_admin import credentials, db  # db 有用到
+from scheduler import generate_gemini_prompt
+from gemini_client import call_gemini_schedule  # 新增
 
 from linebot.v3.webhook import WebhookHandler, MessageEvent
 from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
@@ -53,6 +56,22 @@ def load_data(user_id):
     data = ref.get()
     return data if data else []
 
+def get_today_schedule_for_user(user_id):
+    tasks = load_data(user_id)
+
+    # 測試先用固定偏好（之後可從 Firebase 抓）
+    habits = {
+        "prefered_morning": "閱讀、寫作",
+        "prefered_afternoon": "計算、邏輯"
+    }
+
+    today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+    available_hours = 5
+
+    prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
+    result = call_gemini_schedule(prompt)
+    return result
+
 # 將資料存回 Firebase
 def save_data(data, user_id):
     ref = db.reference(f"users/{user_id}/tasks")
@@ -74,6 +93,45 @@ def get_temp_task(user_id):
 
 def clear_temp_task(user_id):
     db.reference(f"users/{user_id}/temp_task").delete()
+
+#   這段用來Debug Gemini的
+#  
+# @app.route("/generate_schedule", methods=["GET"])
+# def generate_schedule():
+#     user_id = "test123"  # 測試用固定 ID，你之後可改為 LINE 使用者 ID
+#     tasks = load_data(user_id)
+
+#     # 模擬習慣資料（未來可存進 Firebase）
+#     habits = {
+#         "prefered_morning": "閱讀、寫作",
+#         "prefered_afternoon": "計算、邏輯"
+#     }
+
+#     today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+#     available_hours = 5
+
+#     prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
+#     return prompt
+
+
+
+# @app.route("/generate_schedule_with_ai", methods=["GET"])
+# def generate_schedule_with_ai():
+#     user_id = "test123"
+#     tasks = load_data(user_id)
+
+#     habits = {
+#         "prefered_morning": "閱讀、寫作",
+#         "prefered_afternoon": "計算、邏輯"
+#     }
+
+#     today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+#     available_hours = 5
+
+#     prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
+#     result = call_gemini_schedule(prompt)
+
+#     return result
 
 @app.route("/")
 def home():
@@ -301,6 +359,17 @@ def handle_message(event):
             )
         return
     
+    if text == "今日排程":
+        schedule = get_today_schedule_for_user(user_id)
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=schedule)]
+                )
+            )
+        return
+
     elif text == "提醒時間":
         # 取得目前使用者的提醒時間，預設為 08:00
         current_time = db.reference(f"users/{user_id}/remind_time").get() or "08:00"
