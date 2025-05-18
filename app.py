@@ -152,7 +152,14 @@ def remind():
                     )
                 )
                 print(f"[remind] 已推送提醒給 {user_id}")
+
+                # ✅ 新增這段：標記已提醒
+                for task in tasks:
+                    if not task.get("done", False) and not task.get("reminded", False):
+                        task["reminded"] = True
+
                 save_data(tasks, user_id)
+
             except Exception as e:
                 print(f"[remind] 推送失敗給 {user_id}：{e}")
     return "OK"
