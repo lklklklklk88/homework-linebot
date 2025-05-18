@@ -116,7 +116,8 @@ def remind():
             remind_dt = datetime.datetime.strptime(remind_time, "%H:%M")
             remind_datetime = now.replace(hour=remind_dt.hour, minute=remind_dt.minute, second=0, microsecond=0)
 
-            if abs((now - remind_datetime).total_seconds()) > 600:
+            time_diff = (now - remind_datetime).total_seconds()
+            if time_diff < 0 or time_diff > 600:
                 continue
 
         except Exception as e:
