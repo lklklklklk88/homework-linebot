@@ -275,55 +275,78 @@ def handle_message(event):
             )
         return
     
+    elif get_user_state(user_id) == "awaiting_category_text":
+        category = text.strip()
+        task = get_temp_task(user_id)
+        task["category"] = category
+        set_temp_task(user_id, task)
+        set_user_state(user_id, "awaiting_due_date")
+
+        # 這裡呼叫你原本的選擇截止日 bubble
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {"type": "text", "text": f"作業名稱：{task['task']}", "weight": "bold", "size": "md"},
+                    {"type": "text", "text": "請選擇截止日期：", "size": "sm", "color": "#888888"},
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "datetimepicker",
+                            "label": "📅 選擇日期",
+                            "data": "select_due_date",
+                            "mode": "date"
+                        },
+                        "style": "primary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "🚫 不設定截止日",
+                            "data": "no_due_date"
+                        },
+                        "style": "secondary"
+                    }
+                ]
+            }
+        }
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[FlexMessage(
+                        alt_text="選擇截止日期",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                )
+            )
+        return
+    
     elif get_user_state(user_id) == "awaiting_estimated_time":
         try:
             estimated_time = float(text)
             if estimated_time <= 0:
                 raise ValueError
+
             task = get_temp_task(user_id)
             task["estimated_time"] = estimated_time
             set_temp_task(user_id, task)
-            set_user_state(user_id, "awaiting_category")
+            set_user_state(user_id, "awaiting_category_text")  # 新增狀態：請輸入分類
 
-            bubble = {
-                "type": "bubble",
-                "body": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "spacing": "md",
-                    "contents": [
-                        {"type": "text", "text": "請選擇作業類型：", "weight": "bold", "size": "md"},
-                        {
-                            "type": "button",
-                            "action": {"type": "postback", "label": "📖 閱讀", "data": "category_閱讀"},
-                            "style": "primary"
-                        },
-                        {
-                            "type": "button",
-                            "action": {"type": "postback", "label": "📐 計算", "data": "category_計算"},
-                            "style": "primary"
-                        },
-                        {
-                            "type": "button",
-                            "action": {"type": "postback", "label": "📝 寫作", "data": "category_寫作"},
-                            "style": "primary"
-                        }
-                    ]
-                }
-            }
-
+            reply = "請輸入這份作業的類型（例如：報告、背單字、寫程式、簡報⋯⋯）"
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[FlexMessage(
-                            alt_text="選擇作業類型",
-                            contents=FlexContainer.from_dict(bubble)
-                        )]
+                        messages=[TextMessage(text=reply)]
                     )
                 )
             return
-        
         except:
             reply = "⚠️ 請輸入有效的時間（以小時為單位，例如 1.5）"
             with ApiClient(configuration) as api_client:
