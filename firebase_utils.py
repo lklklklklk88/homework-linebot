@@ -1,10 +1,6 @@
-import os, json, tempfile, datetime
+import os, json, tempfile
 import firebase_admin
 from firebase_admin import credentials, db
-
-from scheduler import generate_gemini_prompt
-from gemini_client import call_gemini_schedule
-
 
 # Firebase 初始化
 cred_json = os.getenv("GOOGLE_CREDENTIALS")
@@ -50,15 +46,3 @@ def get_temp_task(user_id):
 
 def clear_temp_task(user_id):
     db.reference(f"users/{user_id}/temp_task").delete()
-
-def get_today_schedule_for_user(user_id):
-    tasks = load_data(user_id)
-    habits = {
-        "prefered_morning": "閱讀、寫作",
-        "prefered_afternoon": "計算、邏輯"
-    }
-    today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
-    available_hours = 5
-    prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
-    result = call_gemini_schedule(prompt)
-    return result

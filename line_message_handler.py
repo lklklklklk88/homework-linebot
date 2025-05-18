@@ -5,16 +5,15 @@ from firebase_utils import (
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task
 )
 from flex_utils import make_schedule_carousel
-from firebase_utils import get_today_schedule_for_user
 from firebase_admin import db
+from gemini_client import call_gemini_schedule
+from scheduler import generate_gemini_prompt
 
 from linebot.v3.webhook import MessageEvent
-from linebot.v3.messaging import MessagingApi, ReplyMessageRequest
+from linebot.v3.messaging import MessagingApi, ReplyMessageRequest, ApiClient, Configuration
 from linebot.v3.messaging.models import TextMessage, FlexMessage, FlexContainer
-from linebot.v3.messaging import ApiClient, Configuration
 
 configuration = Configuration(access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
-
 
 def register_message_handlers(handler):
     @handler.add(MessageEvent)
@@ -526,3 +525,15 @@ def register_message_handlers(handler):
                 )
             )
         return
+    
+def get_today_schedule_for_user(user_id):
+    tasks = load_data(user_id)
+    habits = {
+        "prefered_morning": "閱讀、寫作",
+        "prefered_afternoon": "計算、邏輯"
+    }
+    today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+    available_hours = 5
+    prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
+    result = call_gemini_schedule(prompt)
+    return result
