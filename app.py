@@ -11,6 +11,8 @@ import firebase_admin
 from firebase_admin import credentials, db  # db 有用到
 from scheduler import generate_gemini_prompt
 from gemini_client import call_gemini_schedule  # 新增
+from flex_utils import make_schedule_card, make_schedule_carousel
+
 
 from linebot.v3.webhook import WebhookHandler, MessageEvent
 from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
@@ -414,13 +416,28 @@ def handle_message(event):
             )
         return
     
-    elif text == "今日排程":
-        schedule = get_today_schedule_for_user(user_id)
+    elif text == "今日排程卡片":
+        tasks = load_data(user_id)
+        if not tasks:
+            reply = "😅 目前沒有任何未完成的作業可以排程喔～請先新增作業！"
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text=reply)]
+                    )
+                )
+            return
+
+        flex_content = make_schedule_carousel(tasks[:10])
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=schedule)]
+                    messages=[FlexMessage(
+                        alt_text="今日任務排程",
+                        contents=FlexContainer.from_dict(flex_content)
+                    )]
                 )
             )
         return
