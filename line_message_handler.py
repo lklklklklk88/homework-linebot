@@ -4,7 +4,8 @@ from firebase_utils import (
     load_data, save_data, set_user_state, get_user_state,
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task
 )
-from flex_utils import make_schedule_carousel
+
+from flex_utils import make_schedule_carousel, extract_schedule_blocks, make_timetable_card
 from firebase_admin import db
 from gemini_client import call_gemini_schedule
 from scheduler import generate_gemini_prompt
@@ -196,24 +197,36 @@ def register_message_handlers(handler):
                         )
                     )
                 return
-            
-            #第 1 則：Gemini輸入
-            suggestion = get_today_schedule_for_user(user_id)
 
-            #第 2 則：Flex卡片內容
-            flex_content = make_schedule_carousel(tasks[:10])
+            schedule = get_today_schedule_for_user(user_id)
+
+            messages = [TextMessage(text=schedule["text_summary"])]
+
+            if schedule["task_card"]:
+                messages.append(FlexMessage(
+                    alt_text="📋 今日任務",
+                    contents=FlexContainer.from_dict(schedule["task_card"])
+                ))
+
+            if schedule["backlog_card"]:
+                messages.append(FlexMessage(
+                    alt_text="❌ 補做清單",
+                    contents=FlexContainer.from_dict(schedule["backlog_card"])
+                ))
+
+            if schedule["timetable_card"]:
+                messages.append(FlexMessage(
+                    alt_text="🕘 建議排程",
+                    contents=FlexContainer.from_dict(schedule["timetable_card"])
+                ))
+
+            messages.append(TextMessage(text=schedule["reminder_text"]))
 
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[
-                            TextMessage(text=suggestion),
-                            FlexMessage(
-                                alt_text="今日任務排程",
-                                contents=FlexContainer.from_dict(flex_content)
-                            )
-                        ]
+                        messages=messages
                     )
                 )
             return
@@ -525,7 +538,7 @@ def register_message_handlers(handler):
                 )
             )
         return
-    
+
 def get_today_schedule_for_user(user_id):
     tasks = load_data(user_id)
     habits = {
@@ -534,6 +547,26 @@ def get_today_schedule_for_user(user_id):
     }
     today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
     available_hours = 5
+
     prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
-    result = call_gemini_schedule(prompt)
-    return result
+    result_text = call_gemini_schedule(prompt)
+
+    # 解析排程時間區段並轉為卡片
+    blocks = extract_schedule_blocks(result_text)
+    schedule_card = make_timetable_card(blocks) if blocks else None
+
+    # 製作任務 Flex 卡片
+    today_tasks = [t for t in tasks if not t.get("done", False) and t.get("due") != "未設定"]
+    task_card = make_schedule_carousel(today_tasks) if today_tasks else None
+
+    # 補做清單（未設定截止日）
+    backlog_tasks = [t for t in tasks if not t.get("done", False) and t.get("due") == "未設定"]
+    backlog_card = make_schedule_carousel(backlog_tasks) if backlog_tasks else None
+
+    return {
+        "text_summary": result_text,
+        "task_card": task_card,
+        "backlog_card": backlog_card,
+        "timetable_card": schedule_card,
+        "reminder_text": "⏰ 請記得依照上方時段安排，並在完成後點選『完成作業』按鈕 ✅"
+    }

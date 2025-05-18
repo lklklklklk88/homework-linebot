@@ -1,3 +1,5 @@
+import re
+
 def make_schedule_card(task):
     """
     將單一任務轉為 Flex Bubble 卡片格式。
@@ -54,3 +56,52 @@ def make_schedule_carousel(tasks):
         "type": "carousel",
         "contents": [make_schedule_card(task) for task in tasks[:10]]  # 最多顯示前10個
     }
+
+def extract_schedule_blocks(text):
+    """
+    從 Gemini 回傳文字中擷取時間表內容，例如：
+    "09:00 ~ 11:00 英文報告"
+    "13:30 ~ 14:00 閱讀歷史資料"
+    回傳格式：[{'start': '09:00', 'end': '11:00', 'task': '英文報告'}, ...]
+    """
+    pattern = re.compile(r"(\d{1,2}:\d{2})\s*~\s*(\d{1,2}:\d{2})\s*(.+)")
+    matches = pattern.findall(text)
+    blocks = []
+    for start, end, task in matches:
+        blocks.append({
+            'start': start,
+            'end': end,
+            'task': task.strip()
+        })
+    return blocks
+
+def make_timetable_card(blocks):
+    """
+    接收時間段字典列表，輸出 Flex Bubble 卡片。
+    """
+    rows = []
+    for i, block in enumerate(blocks, 1):
+        rows.append({
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                {"type": "text", "text": f"{block['start']} - {block['end']}", "size": "sm", "flex": 4},
+                {"type": "text", "text": block['task'], "size": "sm", "flex": 8, "wrap": True}
+            ]
+        })
+
+    bubble = {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+                {"type": "text", "text": "🕘 建議排程表", "weight": "bold", "size": "md"},
+                {"type": "separator"},
+                *rows
+            ]
+        }
+    }
+    return bubble
+
