@@ -13,8 +13,6 @@ from linebot.exceptions import InvalidSignatureError
 from firebase_utils import load_data, save_data
 from postback_handler import register_postback_handlers
 from line_message_handler import register_message_handlers
-from gemini_client import call_gemini_schedule
-from scheduler import generate_gemini_prompt
 from firebase_admin import db
 
 app = Flask(__name__)
@@ -31,18 +29,6 @@ line_bot_api = MessagingApi(ApiClient(configuration))
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 register_message_handlers(handler)
 register_postback_handlers(handler)
-
-def get_today_schedule_for_user(user_id):
-    tasks = load_data(user_id)
-    habits = {
-        "prefered_morning": "閱讀、寫作",
-        "prefered_afternoon": "計算、邏輯"
-    }
-    today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
-    available_hours = 5
-    prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
-    result = call_gemini_schedule(prompt)
-    return result
 
 @app.route("/")
 def home():

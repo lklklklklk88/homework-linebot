@@ -4,8 +4,9 @@ from firebase_utils import (
     load_data, save_data, set_user_state, get_user_state,
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task
 )
-from flex_utils import make_schedule_carousel, get_today_schedule_for_user
-from firebase_admin import db  # 因為你還在用 reference 拿 remind_time
+from flex_utils import make_schedule_carousel
+from firebase_utils import get_today_schedule_for_user
+from firebase_admin import db
 
 from linebot.v3.webhook import MessageEvent
 from linebot.v3.messaging import MessagingApi, ReplyMessageRequest
