@@ -1,6 +1,6 @@
 from line_utils import get_line_display_name
 
-def generate_gemini_prompt(user_id, tasks, today, available_hours):
+def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
     display_name = get_line_display_name(user_id)
 
     prompt = f"""
