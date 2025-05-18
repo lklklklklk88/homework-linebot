@@ -4,7 +4,7 @@ from firebase_utils import (
     load_data, save_data, set_user_state, get_user_state,
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task
 )
-from flex_utils import make_schedule_carousel
+from flex_utils import make_schedule_carousel, get_today_schedule_for_user
 from firebase_admin import db  # 因為你還在用 reference 拿 remind_time
 
 from linebot.v3.webhook import MessageEvent
@@ -196,18 +196,11 @@ def register_message_handlers(handler):
                         )
                     )
                 return
+            
+            #第 1 則：Gemini輸入
+            suggestion = get_today_schedule_for_user(user_id)
 
-            # ✅ 第 1 則：貼心建議（語音助理風格）
-            suggestion = (
-                "嗨！以下是我幫你排好的今日任務 👇\n\n"
-                "🧠 建議：\n"
-                "• 上午處理專注任務（例如寫作）\n"
-                "• 下午處理彈性任務（例如程式/筆記）\n"
-                "• 若任務時間過長，請考慮拆分到明天\n\n"
-                "接下來是你的任務卡片："
-            )
-
-            # ✅ 第 2 則：Flex 卡片內容
+            #第 2 則：Flex卡片內容
             flex_content = make_schedule_carousel(tasks[:10])
 
             with ApiClient(configuration) as api_client:
