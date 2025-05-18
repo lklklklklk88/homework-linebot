@@ -263,48 +263,14 @@ def handle_message(event):
     elif get_user_state(user_id) == "awaiting_task_name":
         task_name = text
         set_temp_task(user_id, {"task": task_name})
-        set_user_state(user_id, "awaiting_due_date")
+        set_user_state(user_id, "awaiting_estimated_time")
 
-        bubble = {
-            "type": "bubble",
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "spacing": "md",
-                "contents": [
-                    {"type": "text", "text": f"作業名稱：{task_name}", "weight": "bold", "size": "md"},
-                    {"type": "text", "text": "請選擇截止日期：", "size": "sm", "color": "#888888"},
-                    {
-                        "type": "button",
-                        "action": {
-                            "type": "datetimepicker",
-                            "label": "📅 選擇日期",
-                            "data": "select_due_date",
-                            "mode": "date"
-                        },
-                        "style": "primary"
-                    },
-                    {
-                        "type": "button",
-                        "action": {
-                            "type": "postback",
-                            "label": "🚫 不設定截止日",
-                            "data": "no_due_date"
-                        },
-                        "style": "secondary"
-                    }
-                ]
-            }
-        }
-
+        reply = f"📝 作業名稱為「{task_name}」，請輸入預估完成時間（單位：小時，例如 2 或 1.5）："
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[FlexMessage(
-                        alt_text="選擇截止日期",
-                        contents=FlexContainer.from_dict(bubble)
-                    )]
+                    messages=[TextMessage(text=reply)]
                 )
             )
         return
@@ -357,6 +323,7 @@ def handle_message(event):
                     )
                 )
             return
+        
         except:
             reply = "⚠️ 請輸入有效的時間（以小時為單位，例如 1.5）"
             with ApiClient(configuration) as api_client:
