@@ -112,7 +112,6 @@ def remind():
             db.reference(f"users/{user_id}").set(user_data)
 
         try:
-            # 將提醒時間字串轉成時間物件
             remind_dt = datetime.datetime.strptime(remind_time, "%H:%M")
             remind_datetime = now.replace(hour=remind_dt.hour, minute=remind_dt.minute, second=0, microsecond=0)
 
@@ -124,37 +123,61 @@ def remind():
             print(f"[remind] 使用者 {user_id} 的提醒時間格式錯誤：{remind_time}")
             continue
 
-        message = "📋 以下是你尚未完成的作業：\n"
+        rows = []
         has_task = False
-        for task in tasks:
+        for i, task in enumerate(tasks):
             if not task.get("done", False) and not task.get("reminded", False):
                 has_task = True
-                due_str = task.get("due", "")
-                highlight = ""
+                due = task.get("due", "未設定")
+                label = ""
 
-                # 判斷是否為今天或明天到期
-                try:
-                    due_date = datetime.datetime.strptime(due_str, "%Y-%m-%d").date()
-                    if due_date == now.date():
-                        highlight = "（🔥 今天到期）"
-                    elif due_date == now.date() + datetime.timedelta(days=1):
-                        highlight = "（⚠️ 明天到期）"
-                except:
-                    pass
+                if due != "未設定":
+                    try:
+                        due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
+                        if due_date == now.date():
+                            label = "\n（🔥 今天到期）"
+                        elif due_date == now.date() + datetime.timedelta(days=1):
+                            label = "\n（⚠️ 明天到期）"
+                    except:
+                        pass
 
-                message += f"🔸 {task['task']} {highlight}\n"
+                rows.append({
+                    "type": "box",
+                    "layout": "horizontal",
+                    "contents": [
+                        {"type": "text", "text": f"{i+1}.", "size": "sm", "flex": 1},
+                        {"type": "text", "text": f"🔲 {task['task']}", "size": "sm", "flex": 6, "wrap": True, "maxLines": 3},
+                        {"type": "text", "text": f"{due}{label}", "size": "sm", "flex": 5, "wrap": True}
+                    ]
+                })
 
         if has_task:
+            bubble = {
+                "type": "bubble",
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "sm",
+                    "contents": [
+                        {"type": "text", "text": "📋 以下是你尚未完成的作業：", "weight": "bold", "size": "md"},
+                        {"type": "separator"},
+                        *rows
+                    ]
+                }
+            }
+
             try:
                 line_bot_api.push_message(
                     PushMessageRequest(
                         to=user_id,
-                        messages=[TextMessage(text=message)]
+                        messages=[FlexMessage(
+                            alt_text="提醒作業清單",
+                            contents=FlexContainer.from_dict(bubble)
+                        )]
                     )
                 )
                 print(f"[remind] 已推送提醒給 {user_id}")
 
-                # ✅ 新增這段：標記已提醒
                 for task in tasks:
                     if not task.get("done", False) and not task.get("reminded", False):
                         task["reminded"] = True
@@ -164,7 +187,6 @@ def remind():
             except Exception as e:
                 print(f"[remind] 推送失敗給 {user_id}：{e}")
     return "OK"
-
 
 @handler.add(MessageEvent)
 def handle_message(event):
