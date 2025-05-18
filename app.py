@@ -30,6 +30,11 @@ handler = WebhookHandler(LINE_CHANNEL_SECRET)
 register_message_handlers(handler)
 register_postback_handlers(handler)
 
+def get_line_display_name(user_id):
+    with ApiClient(configuration) as api_client:
+        profile = MessagingApi(api_client).get_profile(user_id)
+        return profile.display_name
+
 @app.route("/")
 def home():
     return "Bot is running"
@@ -107,14 +112,17 @@ def remind():
                 })
 
         if has_task:
+            display_name = get_line_display_name(user_id)
+
             bubble = {
                 "type": "bubble",
                 "body": {
+                    
                     "type": "box",
                     "layout": "vertical",
                     "spacing": "sm",
                     "contents": [
-                        {"type": "text", "text": "📋 以下是你尚未完成的作業：", "weight": "bold", "size": "md"},
+                        {"type": "text", "text": f"👤 {display_name}，以下是你尚未完成的作業：", "weight": "bold", "size": "md"},
                         {"type": "separator"},
                         *rows
                     ]
