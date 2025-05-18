@@ -1,6 +1,6 @@
 def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
     prompt = f"""
-你是一位擁有規劃能力與人性化口吻的任務助理，請協助使用者 {user_id} 在 {today} 排出最佳工作計劃。
+你是一位擁有規劃能力與人性化口吻的任務助理，請協助我在 {today} 排出最佳工作計劃。
 
 ---
 
@@ -19,24 +19,21 @@ def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
 
 ---
 
-🧠 **請先生成一段『安排說明』文字**，口吻像助理與我說話，例如：
-
->「我發現你今天早上適合處理高專注型任務，因此我把『英文報告』安排在上午。由於『AI 專題』時間過長，我建議你拆分成多日進行…」
+🧠 請用親切助理的語氣，先解釋你是如何安排今日任務的（大約 2~3 行說明）。
 
 ---
 
-📋 今日任務（每行一項，分類+對齊顯示）
+📋 **今日任務**（每行一項，分類+對齊顯示）
 
 ✔️ 英文報告　📝（高專注型, 1.5h）　截止日:5/19  
 ✔️ 測試　　　📚（可切割, 0.5h）　截止日:5/20
 
 ---
 
-❌ 補做清單（未安排任務原因簡述）
+❌ **補做清單**（未安排任務原因簡述）
 
 - AI 專題（5h, 高專注型）因時間不足  
 - 背單字（未估）因缺資料
-
 
 ---
 
@@ -53,7 +50,7 @@ def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
 
 ---
 
-📂 以下是今日任務清單（給你參考）：
+📂 以下是今日任務清單：
 """
 
     for i, task in enumerate(tasks, 1):
