@@ -100,23 +100,28 @@ def remind():
     for user_id, user_data in users.items():
         tasks = user_data.get("tasks", [])
         remind_time = user_data.get("remind_time", "08:00")
+
+        # 每天只重置一次提醒狀態
+        last_reset_date = user_data.get("last_reset_date")
+        today_str = now.strftime("%Y-%m-%d")
+
+        if last_reset_date != today_str:
+            for task in tasks:
+                task["reminded"] = False
+            user_data["last_reset_date"] = today_str
+            db.reference(f"users/{user_id}").set(user_data)
+
         try:
             # 將提醒時間字串轉成時間物件
             remind_dt = datetime.datetime.strptime(remind_time, "%H:%M")
             remind_datetime = now.replace(hour=remind_dt.hour, minute=remind_dt.minute, second=0, microsecond=0)
 
-            # 若提醒時間晚於現在，就跳過
-            if now < remind_datetime:
-                continue
-
-            # 若提醒時間比現在早超過 5 分鐘，也跳過
-            if (now - remind_datetime).total_seconds() > 300:
+            if abs((now - remind_datetime).total_seconds()) > 600:
                 continue
 
         except Exception as e:
             print(f"[remind] 使用者 {user_id} 的提醒時間格式錯誤：{remind_time}")
             continue
-
 
         message = "📋 以下是你尚未完成的作業：\n"
         has_task = False
