@@ -659,7 +659,7 @@ def handle_message(event):
             )
         return
 
-    elif text == "選單":
+    elif text == "操作":
         bubble = {
             "type": "bubble",
             "body": {
@@ -712,7 +712,7 @@ def handle_message(event):
                     reply_token=event.reply_token,
                     messages=[
                         FlexMessage(
-                            alt_text="選單",
+                            alt_text="操作",
                             contents=FlexContainer.from_dict(bubble)
                         )
                     ]
