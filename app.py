@@ -359,7 +359,7 @@ def handle_message(event):
             )
         return
     
-    if text == "今日排程":
+    elif text == "今日排程":
         schedule = get_today_schedule_for_user(user_id)
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
