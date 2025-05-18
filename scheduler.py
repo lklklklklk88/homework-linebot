@@ -54,3 +54,43 @@ def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
         prompt += f"{i}. {name}｜D: {due}｜約 {est} 小時｜分類：{category}\n"
 
     return prompt
+
+
+#  這段用來Debug Gemini的
+#  
+# @app.route("/generate_schedule", methods=["GET"])
+# def generate_schedule():
+#     user_id = "test123"  # 測試用固定 ID，你之後可改為 LINE 使用者 ID
+#     tasks = load_data(user_id)
+
+#     # 模擬習慣資料（未來可存進 Firebase）
+#     habits = {
+#         "prefered_morning": "閱讀、寫作",
+#         "prefered_afternoon": "計算、邏輯"
+#     }
+
+#     today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+#     available_hours = 5
+
+#     prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
+#     return prompt
+
+
+
+# @app.route("/generate_schedule_with_ai", methods=["GET"])
+# def generate_schedule_with_ai():
+#     user_id = "test123"
+#     tasks = load_data(user_id)
+
+#     habits = {
+#         "prefered_morning": "閱讀、寫作",
+#         "prefered_afternoon": "計算、邏輯"
+#     }
+
+#     today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+#     available_hours = 5
+
+#     prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
+#     result = call_gemini_schedule(prompt)
+
+#     return result
