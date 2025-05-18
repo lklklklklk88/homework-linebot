@@ -184,7 +184,7 @@ def register_message_handlers(handler):
                 )
             return
         
-        elif text == "今日排程卡片":
+        elif text == "今日排程":
             tasks = load_data(user_id)
             if not tasks:
                 reply = "😅 目前沒有任何未完成的作業可以排程喔～請先新增作業！"
@@ -197,15 +197,30 @@ def register_message_handlers(handler):
                     )
                 return
 
+            # ✅ 第 1 則：貼心建議（語音助理風格）
+            suggestion = (
+                "嗨！以下是我幫你排好的今日任務 👇\n\n"
+                "🧠 建議：\n"
+                "• 上午處理專注任務（例如寫作）\n"
+                "• 下午處理彈性任務（例如程式/筆記）\n"
+                "• 若任務時間過長，請考慮拆分到明天\n\n"
+                "接下來是你的任務卡片："
+            )
+
+            # ✅ 第 2 則：Flex 卡片內容
             flex_content = make_schedule_carousel(tasks[:10])
+
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[FlexMessage(
-                            alt_text="今日任務排程",
-                            contents=FlexContainer.from_dict(flex_content)
-                        )]
+                        messages=[
+                            TextMessage(text=suggestion),
+                            FlexMessage(
+                                alt_text="今日任務排程",
+                                contents=FlexContainer.from_dict(flex_content)
+                            )
+                        ]
                     )
                 )
             return
