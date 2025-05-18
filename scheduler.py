@@ -4,14 +4,22 @@ import datetime
 def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
     display_name = get_line_display_name(user_id)
 
-    # 動態取得目前時間（假設為台灣時間 UTC+8）
+    # 取得目前時間（台灣時間）並進行「半點進位」
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-    current_hour = now.hour
+    minute = now.minute
+    if minute < 30:
+        rounded_minute = 30
+        start_hour = now.hour
+    else:
+        rounded_minute = 0
+        start_hour = now.hour + 1
 
-    # 根據目前時間決定可排時間區段
-    work_start = max(current_hour, 9)
+    # 若結果是整點，則從整點開始；若是半點，則 +0.5
+    work_start = start_hour + (0.5 if rounded_minute == 30 else 0)
     work_end = 23
-    available_hours = min(available_hours, work_end - work_start)
+    available_hours = min(8, work_end - work_start)
+
+    start_str = f"{int(start_hour):02d}:{rounded_minute:02d}"
 
     prompt = f"""
 你是一位擁有規劃能力與人性化口吻的任務助理，請協助 {display_name} 在 {today} 排出最佳工作計劃。
@@ -19,7 +27,7 @@ def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
 ---
 
 📌 安排規則：
-- 使用者今天目前時間是 {current_hour} 點，請安排 {available_hours} 小時任務於 {work_start}:00 至 {work_end}:00 之間
+- 使用者目前時間為 {now.hour}:{now.minute:02d}，請從 {start_str} 起安排 {available_hours} 小時任務（最晚至 23:00 結束）
 - 根據【類別】與【名稱】判斷屬性（高專注型 / 可切割型 / 彈性任務）
 - 優先安排今日到期任務與可用時間內可完成者
 - 預估時間缺失請註記為「預估」
@@ -41,7 +49,7 @@ def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
 
 ---
 
-🕘 建議排程區間：{work_start}:00 ~ {work_end}:00 之間安排任務
+🕘 建議排程：從 {start_str} 起算，安排 {available_hours} 小時內完成
 
 📎 建議：每工作 1 小時休息 5~10 分鐘；可用「完成作業」標記進度。
 
