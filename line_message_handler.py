@@ -537,13 +537,22 @@ def get_today_schedule_for_user(user_id):
     prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
     raw_text = call_gemini_schedule(prompt)
 
-    # 直接使用原始 Gemini 回應當成說明文字
-    result_text = raw_text.strip() or "📌 以下是為您安排的建議排程："
+    # 分離說明文字和時間表
+    explanation = ""
+    schedule_text = ""
+    
+    if "📝 排程說明：" in raw_text and "🕘 建議時間表：" in raw_text:
+        parts = raw_text.split("🕘 建議時間表：")
+        explanation = parts[0].replace("📝 排程說明：", "").strip()
+        schedule_text = parts[1].strip()
+    else:
+        explanation = "📌 以下是為您安排的建議排程："
+        schedule_text = raw_text.strip()
 
-    blocks = extract_schedule_blocks(raw_text)
+    blocks = extract_schedule_blocks(schedule_text)
     schedule_card = make_timetable_card(blocks) if blocks else None
 
     return {
-        "text_summary": result_text,
+        "text_summary": explanation,
         "timetable_card": schedule_card
     }
