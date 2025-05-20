@@ -24,38 +24,40 @@ def extract_schedule_blocks(text):
 
 def make_timetable_card(blocks):
     """
-    接收時間段字典列表，輸出 Flex Bubble 卡片（升級美化版）
+    接收時間段字典列表，輸出乾淨無 emoji 的 Flex Bubble 卡片
     """
     rows = []
     for block in blocks:
+        start = block['start']
+        end = block['end']
         task_text = block['task']
-        is_done = '完成作業' in task_text
 
-        # 判斷任務主體與完成標記
-        main_text = task_text.replace('完成作業', '').strip()
-        emoji = "✍️" if any(x in main_text for x in ["寫", "作", "報告"]) else "📚" if "讀" in main_text else "💻"
+        # 移除 emoji 與雜訊（已由 extract_schedule_blocks 預清理）
+        clean_text = task_text.strip()
 
-        # 時段主體
-        if main_text:
-            rows.append({
-                "type": "box",
-                "layout": "horizontal",
-                "contents": [
-                    {"type": "text", "text": f"⏰ {block['start']} - {block['end']}", "size": "sm", "color": "#666666", "flex": 5},
-                    {"type": "text", "text": f"{emoji} {main_text}", "size": "sm", "color": "#111111", "flex": 7, "wrap": True}
-                ]
-            })
+        rows.append({
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": f"{start} - {end}",
+                    "size": "sm",
+                    "color": "#555555",
+                    "flex": 4
+                },
+                {
+                    "type": "text",
+                    "text": clean_text,
+                    "size": "sm",
+                    "color": "#111111",
+                    "flex": 8,
+                    "wrap": True
+                }
+            ]
+        })
 
-        # 補上 ✅ 完成作業提示（獨立行）
-        if is_done:
-            rows.append({
-                "type": "box",
-                "layout": "horizontal",
-                "contents": [
-                    {"type": "text", "text": "", "size": "sm", "flex": 5},
-                    {"type": "text", "text": "✅ 完成作業", "size": "sm", "color": "#2E7D32", "flex": 7}
-                ]
-            })
+        rows.append({"type": "separator"})
 
     bubble = {
         "type": "bubble",
@@ -64,7 +66,13 @@ def make_timetable_card(blocks):
             "layout": "vertical",
             "spacing": "sm",
             "contents": [
-                {"type": "text", "text": "🕘 建議排程表", "weight": "bold", "size": "lg", "color": "#1E88E5"},
+                {
+                    "type": "text",
+                    "text": "建議排程表",
+                    "weight": "bold",
+                    "size": "lg",
+                    "color": "#1E88E5"
+                },
                 {"type": "separator"},
                 *rows
             ]

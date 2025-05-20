@@ -200,19 +200,7 @@ def register_message_handlers(handler):
 
             schedule = get_today_schedule_for_user(user_id)
 
-            messages = [TextMessage(text=schedule["text_summary"])]
-
-            if schedule["task_card"]:
-                messages.append(FlexMessage(
-                    alt_text="📋 今日任務",
-                    contents=FlexContainer.from_dict(schedule["task_card"])
-                ))
-
-            if schedule["backlog_card"]:
-                messages.append(FlexMessage(
-                    alt_text="❌ 補做清單",
-                    contents=FlexContainer.from_dict(schedule["backlog_card"])
-                ))
+            messages = []
 
             if schedule["timetable_card"]:
                 messages.append(FlexMessage(
