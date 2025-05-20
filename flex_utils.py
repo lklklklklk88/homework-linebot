@@ -46,7 +46,7 @@ def make_timetable_card(blocks):
                     "type": "text",
                     "text": time_range,
                     "size": "sm",
-                    "flex": 4,
+                    "flex": 5,
                     "color": "#1E88E5"
                 },
                 {
