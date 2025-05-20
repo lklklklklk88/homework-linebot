@@ -5,7 +5,7 @@ from firebase_utils import (
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task
 )
 
-from flex_utils import make_schedule_carousel, extract_schedule_blocks, make_timetable_card
+from flex_utils import make_schedule_carousel, extract_schedule_blocks, make_timetable_card, make_weekly_progress_card
 from firebase_admin import db
 from gemini_client import call_gemini_schedule
 from scheduler import generate_gemini_prompt
@@ -451,6 +451,26 @@ def register_message_handlers(handler):
                 )
             return
 
+        elif text == "查看進度":
+            progress = get_weekly_progress(user_id)
+            card = make_weekly_progress_card(
+                progress["completed_tasks"],
+                progress["total_hours"],
+                progress["avg_hours_per_day"]
+            )
+            
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[FlexMessage(
+                            alt_text="本週進度",
+                            contents=FlexContainer.from_dict(card)
+                        )]
+                    )
+                )
+            return
+
         elif text == "操作":
             bubble = {
                 "type": "bubble",
@@ -540,19 +560,51 @@ def get_today_schedule_for_user(user_id):
     # 分離說明文字和時間表
     explanation = ""
     schedule_text = ""
+    total_hours = 0
     
     if "📝 排程說明：" in raw_text and "🕘 建議時間表：" in raw_text:
         parts = raw_text.split("🕘 建議時間表：")
         explanation = parts[0].replace("📝 排程說明：", "").strip()
         schedule_text = parts[1].strip()
+        
+        # 提取總時數
+        if "⏱️ 今日任務總長：" in schedule_text:
+            total_parts = schedule_text.split("⏱️ 今日任務總長：")
+            schedule_text = total_parts[0].strip()
+            total_hours = float(total_parts[1].split("小時")[0].strip())
     else:
         explanation = "📌 以下是為您安排的建議排程："
         schedule_text = raw_text.strip()
 
     blocks = extract_schedule_blocks(schedule_text)
-    schedule_card = make_timetable_card(blocks) if blocks else None
+    schedule_card = make_timetable_card(blocks, total_hours) if blocks else None
 
     return {
         "text_summary": explanation,
         "timetable_card": schedule_card
+    }
+
+def get_weekly_progress(user_id):
+    """
+    計算並回傳使用者的週進度
+    """
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+    start_of_week = now - datetime.timedelta(days=now.weekday())
+    end_of_week = start_of_week + datetime.timedelta(days=6)
+    
+    tasks = load_data(user_id)
+    completed_tasks = 0
+    total_hours = 0
+    
+    for task in tasks:
+        if task.get("done", False):
+            completed_tasks += 1
+            total_hours += task.get("estimated_time", 0)
+    
+    avg_hours_per_day = total_hours / 7 if completed_tasks > 0 else 0
+    
+    return {
+        "completed_tasks": completed_tasks,
+        "total_hours": total_hours,
+        "avg_hours_per_day": avg_hours_per_day
     }

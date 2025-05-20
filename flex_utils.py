@@ -2,34 +2,33 @@ import re
 
 def extract_schedule_blocks(text):
     """
-    強化版：從 Gemini 回傳文字中擷取時間表內容
+    從 Gemini 回傳文字中擷取時間表內容
     支援格式：
-    - 20:00 ~ 20:50 任務內容（備註）
-    - 13:30 - 14:00 任務內容
-    - 各種括號/emoji會被移除
+    09:30 - 10:30｜寫 C# 判斷式｜60分鐘｜類型：高專注
     """
-    pattern = re.compile(r"(\d{1,2}:\d{2})\s*[\-~～]\s*(\d{1,2}:\d{2})\s*(.+)")
+    pattern = re.compile(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*｜(.+?)\s*｜(\d+)分鐘\s*｜類型：(.+)")
     matches = pattern.findall(text)
     blocks = []
-    for start, end, task in matches:
-        cleaned_task = re.sub(r"[（(][^）)]+[）)]", "", task)  # 移除括號
-        cleaned_task = re.sub(r"[\u2600-\u26FF\u2700-\u27BF\U0001F300-\U0001FAFF]+", "", cleaned_task)
-        cleaned_task = cleaned_task.strip()
+    for start, end, task, duration, category in matches:
         blocks.append({
             'start': start,
             'end': end,
-            'task': cleaned_task
+            'task': task,
+            'duration': f"{duration}分鐘",
+            'category': category
         })
     return blocks
 
-def make_timetable_card(blocks):
+def make_timetable_card(blocks, total_hours):
     """
-    仿照『查看作業』風格，輸出三欄整齊排版建議排程卡片
+    製作時間表卡片，包含任務列表和操作按鈕
     """
     rows = []
     for idx, block in enumerate(blocks, start=1):
         time_range = f"{block['start']} - {block['end']}"
         task_text = block['task']
+        duration = block.get('duration', '')
+        category = block.get('category', '')
 
         rows.append({
             "type": "box",
@@ -46,21 +45,75 @@ def make_timetable_card(blocks):
                     "type": "text",
                     "text": time_range,
                     "size": "sm",
-                    "flex": 5,
+                    "flex": 4,
                     "color": "#1E88E5"
                 },
                 {
                     "type": "text",
                     "text": task_text,
                     "size": "sm",
-                    "flex": 7,
+                    "flex": 6,
                     "wrap": True,
                     "color": "#111111"
+                },
+                {
+                    "type": "text",
+                    "text": f"{duration}｜{category}",
+                    "size": "sm",
+                    "flex": 4,
+                    "color": "#666666"
                 }
             ]
         })
 
+        # 添加操作按鈕
+        rows.append({
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "✅ 完成",
+                        "data": f"complete_task_{idx}"
+                    },
+                    "style": "primary",
+                    "color": "#4CAF50",
+                    "flex": 1
+                },
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "⏰ 延後",
+                        "data": f"delay_task_{idx}"
+                    },
+                    "style": "secondary",
+                    "flex": 1
+                },
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "🗑️ 刪除",
+                        "data": f"delete_task_{idx}"
+                    },
+                    "style": "secondary",
+                    "color": "#FF3B30",
+                    "flex": 1
+                }
+            ],
+            "spacing": "sm",
+            "margin": "sm"
+        })
+
         rows.append({"type": "separator"})
+
+    # 添加總時數資訊
+    total_hours_text = f"⏱️ 今日任務總長：{total_hours}小時"
+    if total_hours > 7:
+        total_hours_text += "\n⚠️ 今天安排較滿，建議保留喘息時間"
 
     bubble = {
         "type": "bubble",
@@ -76,7 +129,14 @@ def make_timetable_card(blocks):
                     "size": "md"
                 },
                 {"type": "separator"},
-                *rows
+                *rows,
+                {
+                    "type": "text",
+                    "text": total_hours_text,
+                    "size": "sm",
+                    "color": "#666666",
+                    "margin": "md"
+                }
             ]
         }
     }
@@ -132,6 +192,49 @@ def make_schedule_carousel(tasks):
         "contents": [make_schedule_card(task) for task in tasks[:10]]
     }
 
+def make_weekly_progress_card(completed_tasks, total_hours, avg_hours_per_day):
+    """
+    製作週進度卡片
+    """
+    bubble = {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "📊 本週進度",
+                    "weight": "bold",
+                    "size": "lg"
+                },
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "sm",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": f"✅ 已完成任務：{completed_tasks} 項",
+                            "size": "md"
+                        },
+                        {
+                            "type": "text",
+                            "text": f"⏱️ 總工作時數：{total_hours} 小時",
+                            "size": "md"
+                        },
+                        {
+                            "type": "text",
+                            "text": f"📈 平均每日：{avg_hours_per_day:.1f} 小時",
+                            "size": "md"
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    return bubble
 
 # 其他卡片略（保持不變）...
 # make_schedule_card, make_schedule_carousel 保留原樣
