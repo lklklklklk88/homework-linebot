@@ -537,18 +537,9 @@ def get_today_schedule_for_user(user_id):
     prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
     raw_text = call_gemini_schedule(prompt)
 
-    # 只保留開場段落（第一段換行前或 3 行以內）
-    lines = raw_text.strip().splitlines()
-    first_paragraph = []
-    for line in lines:
-        if line.strip() == "" or "---" in line:
-            break
-        first_paragraph.append(line.strip())
-        if len(first_paragraph) >= 3:
-            break
-    result_text = "\n".join(first_paragraph)
+    # 直接使用原始 Gemini 回應當成說明文字
+    result_text = raw_text.strip() or "📌 以下是為您安排的建議排程："
 
-    # 從整段原始文字中提取時間段卡片（正確！）
     blocks = extract_schedule_blocks(raw_text)
     schedule_card = make_timetable_card(blocks) if blocks else None
 

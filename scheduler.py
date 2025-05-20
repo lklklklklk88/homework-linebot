@@ -39,4 +39,4 @@ def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
         category = task.get("category", "未分類")
         prompt += f"{i}. {name}｜D: {due}｜約 {est} 小時｜分類：{category}\n"
 
-    return prompt.strip()
+    return prompt
