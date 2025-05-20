@@ -535,24 +535,19 @@ def get_today_schedule_for_user(user_id):
     available_hours = 5
 
     prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
-    result_text = call_gemini_schedule(prompt)
+    raw_text = call_gemini_schedule(prompt)
+
+    # 刪除區塊：📋 今日任務、❌ 補做清單、🕘 建議排程 之後的內容
+    filtered_text = raw_text.split("---")[0].strip()
+
+    result_text = filtered_text
 
     # 解析排程時間區段並轉為卡片
     blocks = extract_schedule_blocks(result_text)
     schedule_card = make_timetable_card(blocks) if blocks else None
 
-    # 製作任務 Flex 卡片
-    today_tasks = [t for t in tasks if not t.get("done", False) and t.get("due") != "未設定"]
-    task_card = make_schedule_carousel(today_tasks) if today_tasks else None
-
-    # 補做清單（未設定截止日）
-    backlog_tasks = [t for t in tasks if not t.get("done", False) and t.get("due") == "未設定"]
-    backlog_card = make_schedule_carousel(backlog_tasks) if backlog_tasks else None
-
     return {
         "text_summary": result_text,
-        "task_card": task_card,
-        "backlog_card": backlog_card,
         "timetable_card": schedule_card,
         "reminder_text": "⏰ 請記得依照上方時段安排，並在完成後點選『完成作業』按鈕 ✅"
     }
