@@ -200,7 +200,7 @@ def register_message_handlers(handler):
 
             schedule = get_today_schedule_for_user(user_id)
 
-            messages = []
+            messages = [TextMessage(text=schedule["text_summary"])]
 
             if schedule["timetable_card"]:
                 messages.append(FlexMessage(
@@ -208,7 +208,8 @@ def register_message_handlers(handler):
                     contents=FlexContainer.from_dict(schedule["timetable_card"])
                 ))
 
-            messages.append(TextMessage(text=schedule["reminder_text"]))
+            # 替代提醒文字
+            messages.append(TextMessage(text="📎 請至『完成作業』選擇要完成的項目。"))
 
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(

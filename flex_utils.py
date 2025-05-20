@@ -24,16 +24,12 @@ def extract_schedule_blocks(text):
 
 def make_timetable_card(blocks):
     """
-    接收時間段字典列表，輸出乾淨無 emoji 的 Flex Bubble 卡片
+    仿照『查看作業』風格，輸出三欄整齊排版建議排程卡片
     """
     rows = []
-    for block in blocks:
-        start = block['start']
-        end = block['end']
+    for idx, block in enumerate(blocks, start=1):
+        time_range = f"{block['start']} - {block['end']}"
         task_text = block['task']
-
-        # 移除 emoji 與雜訊（已由 extract_schedule_blocks 預清理）
-        clean_text = task_text.strip()
 
         rows.append({
             "type": "box",
@@ -41,18 +37,25 @@ def make_timetable_card(blocks):
             "contents": [
                 {
                     "type": "text",
-                    "text": f"{start} - {end}",
+                    "text": f"{idx}.",
                     "size": "sm",
-                    "color": "#555555",
-                    "flex": 4
+                    "flex": 1,
+                    "color": "#666666"
                 },
                 {
                     "type": "text",
-                    "text": clean_text,
+                    "text": time_range,
                     "size": "sm",
-                    "color": "#111111",
-                    "flex": 8,
-                    "wrap": True
+                    "flex": 4,
+                    "color": "#1E88E5"
+                },
+                {
+                    "type": "text",
+                    "text": task_text,
+                    "size": "sm",
+                    "flex": 7,
+                    "wrap": True,
+                    "color": "#111111"
                 }
             ]
         })
@@ -68,10 +71,9 @@ def make_timetable_card(blocks):
             "contents": [
                 {
                     "type": "text",
-                    "text": "建議排程表",
+                    "text": "🕘 建議排程",
                     "weight": "bold",
-                    "size": "lg",
-                    "color": "#1E88E5"
+                    "size": "md"
                 },
                 {"type": "separator"},
                 *rows
