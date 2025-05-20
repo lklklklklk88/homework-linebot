@@ -1,22 +1,63 @@
 import re
+import datetime
 
 def extract_schedule_blocks(text):
     """
     從 Gemini 回傳文字中擷取時間表內容
-    支援格式：
-    09:30 - 10:30｜寫 C# 判斷式｜60分鐘｜類型：高專注
+    支援多種格式：
+    1. 09:30 - 10:30｜寫 C# 判斷式｜60分鐘｜類型：高專注
+    2. 09:30 - 10:30 寫 C# 判斷式（60分鐘）
+    3. 09:30 - 10:30 寫 C# 判斷式
     """
-    pattern = re.compile(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*｜(.+?)\s*｜(\d+)分鐘\s*｜類型：(.+)")
-    matches = pattern.findall(text)
     blocks = []
-    for start, end, task, duration, category in matches:
-        blocks.append({
-            'start': start,
-            'end': end,
-            'task': task,
-            'duration': f"{duration}分鐘",
-            'category': category
-        })
+    
+    # 嘗試第一種格式（完整格式）
+    pattern1 = re.compile(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*｜(.+?)\s*｜(\d+)分鐘\s*｜類型：(.+)")
+    matches1 = pattern1.findall(text)
+    if matches1:
+        for start, end, task, duration, category in matches1:
+            blocks.append({
+                'start': start,
+                'end': end,
+                'task': task,
+                'duration': f"{duration}分鐘",
+                'category': category
+            })
+        return blocks
+    
+    # 嘗試第二種格式（帶括號的時長）
+    pattern2 = re.compile(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(.+?)\s*（(\d+)分鐘）")
+    matches2 = pattern2.findall(text)
+    if matches2:
+        for start, end, task, duration in matches2:
+            blocks.append({
+                'start': start,
+                'end': end,
+                'task': task,
+                'duration': f"{duration}分鐘",
+                'category': "未分類"
+            })
+        return blocks
+    
+    # 嘗試第三種格式（簡單格式）
+    pattern3 = re.compile(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(.+)")
+    matches3 = pattern3.findall(text)
+    if matches3:
+        for start, end, task in matches3:
+            # 計算時長
+            start_time = datetime.datetime.strptime(start, "%H:%M")
+            end_time = datetime.datetime.strptime(end, "%H:%M")
+            duration_minutes = int((end_time - start_time).total_seconds() / 60)
+            
+            blocks.append({
+                'start': start,
+                'end': end,
+                'task': task.strip(),
+                'duration': f"{duration_minutes}分鐘",
+                'category': "未分類"
+            })
+        return blocks
+    
     return blocks
 
 def make_timetable_card(blocks, total_hours):

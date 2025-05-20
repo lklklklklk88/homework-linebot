@@ -1,5 +1,6 @@
 import os
 import datetime
+import re
 from firebase_utils import (
     load_data, save_data, set_user_state, get_user_state,
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task
@@ -562,7 +563,8 @@ def get_today_schedule_for_user(user_id):
     schedule_text = ""
     total_hours = 0
     
-    if "📝 排程說明：" in raw_text and "🕘 建議時間表：" in raw_text:
+    # 檢查是否包含時間表標記
+    if "🕘 建議時間表：" in raw_text:
         parts = raw_text.split("🕘 建議時間表：")
         explanation = parts[0].replace("📝 排程說明：", "").strip()
         schedule_text = parts[1].strip()
@@ -573,8 +575,23 @@ def get_today_schedule_for_user(user_id):
             schedule_text = total_parts[0].strip()
             total_hours = float(total_parts[1].split("小時")[0].strip())
     else:
-        explanation = "📌 以下是為您安排的建議排程："
-        schedule_text = raw_text.strip()
+        # 如果沒有找到時間表標記，嘗試直接解析
+        lines = raw_text.split('\n')
+        schedule_lines = []
+        explanation_lines = []
+        
+        for line in lines:
+            if re.match(r'\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}', line):
+                schedule_lines.append(line)
+            else:
+                explanation_lines.append(line)
+        
+        explanation = '\n'.join(explanation_lines).strip()
+        schedule_text = '\n'.join(schedule_lines).strip()
+        
+        # 計算總時數
+        blocks = extract_schedule_blocks(schedule_text)
+        total_hours = sum(float(block['duration'].replace('分鐘', '')) / 60 for block in blocks)
 
     blocks = extract_schedule_blocks(schedule_text)
     schedule_card = make_timetable_card(blocks, total_hours) if blocks else None
