@@ -1,6 +1,3 @@
-from line_utils import get_line_display_name
-import datetime
-
 def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
     display_name = get_line_display_name(user_id)
 
@@ -13,13 +10,23 @@ def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
     start_str = f"{int(start_hour):02d}:{start_minute:02d}"
 
     prompt = f"""
-你是一位親切又有效率的任務助理，請針對 {display_name} 在 {today} 安排工作建議。
-目前時間為 {now.hour}:{now.minute:02d}，他今天的可支配時間是 {available_hours} 小時。
+你是一位親切又有效率的任務助理，請針對 {display_name} 在 {today} 規劃最佳工作排程。
 
-請你根據任務的【類型】與【名稱】，自行判斷優先順序與安排邏輯，並以親切人性化的語氣，給出不超過 3 行的說明。
-**請不要提供任務清單、補做清單或排程表，這些會由程式處理。**
+目前時間為 {now.hour}:{now.minute:02d}，可支配時間為 {available_hours} 小時，請從 {start_str} 開始安排。
 
-以下是今日任務資料（供參考用，不需列出）：
+請根據任務的名稱、截止日、類型（閱讀/寫作/邏輯/程式等）進行排序與時間分配。回覆請只包含以下時間排程格式，每行一段時間，不需要多餘說明。
+
+---
+
+請使用這種格式（時間區段 + 任務名 + 時數）：
+
+13:00 - 14:30 英文報告（1.5 小時）  
+14:30 - 15:00 休息  
+15:00 - 16:30 數學題目（2 小時）
+
+---
+
+以下是任務資料（供你安排時間順序使用）：
 """
 
     for i, task in enumerate(tasks, 1):
