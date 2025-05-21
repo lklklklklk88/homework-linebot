@@ -570,11 +570,11 @@ def handle_postback(event):
         
         # 根據動作類型處理
         if action_type == 'done':
-            return handle_task_completion(user_id, task_name)
+            handle_task_completion(event, user_id, task_name)
         elif action_type == 'delete':
-            return handle_task_deletion(user_id, task_name)
+            handle_task_deletion(event, user_id, task_name)
         elif action_type == 'delay':
-            return handle_task_delay(user_id, task_name)
+            handle_task_delay(event, user_id, task_name)
         else:
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
@@ -608,44 +608,98 @@ def parse_postback_data(data):
     except:
         return None, None
 
-def handle_task_completion(user_id, task_name):
+def handle_task_completion(event, user_id, task_name):
     """
     處理任務完成
     """
     try:
         success = update_task_status(user_id, task_name, "completed")
         if success:
-            return TextSendMessage(text=f"✅ 恭喜完成任務：{task_name}")
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text=f"✅ 恭喜完成任務：{task_name}")]
+                    )
+                )
         else:
-            return TextSendMessage(text="更新任務狀態失敗，請稍後再試。")
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="更新任務狀態失敗，請稍後再試。")]
+                    )
+                )
     except Exception as e:
         print(f"處理任務完成時發生錯誤：{str(e)}")
-        return TextSendMessage(text="處理任務完成時發生錯誤，請稍後再試。")
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="處理任務完成時發生錯誤，請稍後再試。")]
+                )
+            )
 
-def handle_task_deletion(user_id, task_name):
+def handle_task_deletion(event, user_id, task_name):
     """
     處理任務刪除
     """
     try:
         success = delete_task(user_id, task_name)
         if success:
-            return TextSendMessage(text=f"🗑️ 已刪除任務：{task_name}")
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text=f"🗑️ 已刪除任務：{task_name}")]
+                    )
+                )
         else:
-            return TextSendMessage(text="刪除任務失敗，請稍後再試。")
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="刪除任務失敗，請稍後再試。")]
+                    )
+                )
     except Exception as e:
         print(f"處理任務刪除時發生錯誤：{str(e)}")
-        return TextSendMessage(text="處理任務刪除時發生錯誤，請稍後再試。")
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="處理任務刪除時發生錯誤，請稍後再試。")]
+                )
+            )
 
-def handle_task_delay(user_id, task_name):
+def handle_task_delay(event, user_id, task_name):
     """
     處理任務延後
     """
     try:
         success = delay_task(user_id, task_name)
         if success:
-            return TextSendMessage(text=f"⏰ 已延後任務：{task_name}")
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text=f"⏰ 已延後任務：{task_name}")]
+                    )
+                )
         else:
-            return TextSendMessage(text="延後任務失敗，請稍後再試。")
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="延後任務失敗，請稍後再試。")]
+                    )
+                )
     except Exception as e:
         print(f"處理任務延後時發生錯誤：{str(e)}")
-        return TextSendMessage(text="處理任務延後時發生錯誤，請稍後再試。")
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="處理任務延後時發生錯誤，請稍後再試。")]
+                )
+            )
