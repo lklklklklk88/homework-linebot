@@ -31,7 +31,7 @@ def register_message_handlers(handler):
 
         if handle_add_task_flow(event, user_id, text):
             return
-
+        
         if text == "完成作業":
             if not data:
                 reply = "目前沒有任何作業可完成。"
@@ -97,8 +97,8 @@ def register_message_handlers(handler):
                     MessagingApi(api_client).reply_message(
                         ReplyMessageRequest(
                             reply_token=event.reply_token,
-                            messages=[TextMessage(text=response)]
-                        )
+                                messages=[TextMessage(text=response)]
+                            )
                     )
             return
 
@@ -426,7 +426,6 @@ def get_today_schedule_for_user(user_id):
     獲取用戶今日排程
     """
     try:
-        # 獲取用戶資料
         tasks = load_data(user_id)
         habits = {
             "prefered_morning": "閱讀、寫作",
@@ -438,14 +437,10 @@ def get_today_schedule_for_user(user_id):
         prompt = generate_schedule_prompt(user_id, tasks, habits, today, available_hours)
         raw_text = call_gemini_schedule(prompt)
 
-        # 解析回應
         explanation, schedule_text, total_hours = parse_schedule_response(raw_text)
-        
-        # 生成時間表卡片
         blocks = extract_schedule_blocks(schedule_text)
         timetable_card = make_timetable_card(blocks, total_hours)
         
-        # 組合回應
         messages = []
         if explanation:
             messages.append(TextMessage(text=explanation))
@@ -456,7 +451,6 @@ def get_today_schedule_for_user(user_id):
             ))
         
         return messages if messages else "抱歉，無法生成排程，請稍後再試。"
-        
     except Exception as e:
         print(f"生成排程時發生錯誤：{str(e)}")
         return "抱歉，生成排程時發生錯誤，請稍後再試。"
@@ -539,7 +533,7 @@ def get_weekly_progress(user_id):
             total_hours += task.get("estimated_time", 0)
     
     avg_hours_per_day = total_hours / 7 if completed_tasks > 0 else 0
-    
+
     return {
         "completed_tasks": completed_tasks,
         "total_hours": total_hours,
@@ -778,6 +772,20 @@ def handle_add_task_flow(event, user_id, text):
 
     elif state == "awaiting_task_type":
         # 處理手動輸入的類型
+        temp_task = get_temp_task(user_id)  # 重新獲取臨時任務
+        if not temp_task or 'task' not in temp_task or 'estimated_time' not in temp_task:
+            # 如果缺少必要資訊，重置流程
+            clear_temp_task(user_id)
+            clear_user_state(user_id)
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="❌ 發生錯誤，請重新開始新增作業流程")]
+                    )
+                )
+            return True
+
         temp_task["category"] = text
         set_temp_task(user_id, temp_task)
         
