@@ -14,14 +14,21 @@ def extract_schedule_blocks(text):
     # 調試訊息
     print("開始解析排程文字：", text)
     
-    # 匹配新格式（更寬鬆的匹配）
-    pattern = re.compile(r'\d+\.\s*([^\s]+)?\s*(\d{1,2}:\d{2})\s*[~-]\s*(\d{1,2}:\d{2})\s*[｜|]\s*([^（(]+?)(?:\s*[（(](\d+)分鐘[）)])?')
-    matches = pattern.findall(text)
+    # 先將文字按行分割
+    lines = text.strip().split('\n')
     
-    print("匹配結果：", matches)
-    
-    if matches:
-        for emoji, start, end, task, duration in matches:
+    for line in lines:
+        # 跳過空行
+        if not line.strip():
+            continue
+            
+        # 匹配新格式
+        pattern = re.compile(r'\d+\.\s*([^\s]+)?\s*(\d{1,2}:\d{2})\s*[~-]\s*(\d{1,2}:\d{2})\s*[｜|]\s*(.*?)(?:\s*[（(](\d+)分鐘[）)])?$')
+        match = pattern.search(line)
+        
+        if match:
+            emoji, start, end, task, duration = match.groups()
+            
             # 檢查任務是否包含類別
             task_parts = task.split('｜')
             task_name = task_parts[0].strip()
@@ -45,14 +52,15 @@ def extract_schedule_blocks(text):
                 'category': category,
                 'emoji': emoji if emoji else "🕘"
             })
-        return blocks
-    
-    # 如果沒有匹配到新格式，嘗試更簡單的格式
-    pattern_simple = re.compile(r'\d+\.\s*(\d{1,2}:\d{2})\s*[~-]\s*(\d{1,2}:\d{2})\s*[｜|]\s*([^（(]+?)(?:\s*[（(](\d+)分鐘[）)])?')
-    matches_simple = pattern_simple.findall(text)
-    
-    if matches_simple:
-        for start, end, task, duration in matches_simple:
+            continue
+            
+        # 如果沒有匹配到新格式，嘗試更簡單的格式
+        pattern_simple = re.compile(r'\d+\.\s*(\d{1,2}:\d{2})\s*[~-]\s*(\d{1,2}:\d{2})\s*[｜|]\s*(.*?)(?:\s*[（(](\d+)分鐘[）)])?$')
+        match_simple = pattern_simple.search(line)
+        
+        if match_simple:
+            start, end, task, duration = match_simple.groups()
+            
             # 計算時長
             if not duration:
                 try:
@@ -72,8 +80,8 @@ def extract_schedule_blocks(text):
                 'category': "未分類",
                 'emoji': "🕘"
             })
-        return blocks
     
+    print("解析結果：", blocks)
     return blocks
 
 def make_timetable_card(blocks, total_hours):
