@@ -786,6 +786,7 @@ def handle_add_task_flow(event, user_id, text):
                 )
             return True
 
+        # 更新作業類型
         temp_task["category"] = text
         set_temp_task(user_id, temp_task)
         
@@ -798,9 +799,9 @@ def handle_add_task_flow(event, user_id, text):
                 "spacing": "md",
                 "contents": [
                     {"type": "text", "text": "📝 確認新增作業", "weight": "bold", "size": "lg"},
-                    {"type": "text", "text": f"作業名稱：{temp_task['task']}", "size": "md"},
-                    {"type": "text", "text": f"預估時間：{temp_task['estimated_time']} 小時", "size": "md"},
-                    {"type": "text", "text": f"作業類型：{temp_task['category']}", "size": "md"}
+                    {"type": "text", "text": f"作業名稱：{temp_task.get('task', '未設定')}", "size": "md"},
+                    {"type": "text", "text": f"預估時間：{temp_task.get('estimated_time', 0)} 小時", "size": "md"},
+                    {"type": "text", "text": f"作業類型：{temp_task.get('category', '未設定')}", "size": "md"}
                 ]
             },
             "footer": {
