@@ -815,6 +815,83 @@ def handle_add_task_flow(event, user_id, text):
         # 更新作業類型
         temp_task["category"] = text
         set_temp_task(user_id, temp_task)
+        set_user_state(user_id, "awaiting_task_due")
+        
+        # 顯示截止日期選擇 UI
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {"type": "text", "text": "📅 請選擇截止日期", "weight": "bold", "size": "lg"},
+                    {"type": "text", "text": "或選擇不設定截止日期", "size": "sm", "color": "#888888"},
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "datetimepicker",
+                            "label": "📅 選擇日期",
+                            "data": "select_task_due",
+                            "mode": "date",
+                            "initial": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d"),
+                            "max": "2099-12-31",
+                            "min": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+                        },
+                        "style": "primary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "❌ 不設定截止日期",
+                            "data": "no_due_date"
+                        },
+                        "style": "secondary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "❌ 取消",
+                            "data": "cancel_add_task"
+                        },
+                        "style": "secondary"
+                    }
+                ]
+            }
+        }
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[FlexMessage(
+                        alt_text="請選擇截止日期",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                )
+            )
+        return True
+
+    elif state == "awaiting_task_due":
+        # 處理手動輸入的截止日期
+        temp_task = get_temp_task(user_id)
+        if not temp_task:
+            clear_temp_task(user_id)
+            clear_user_state(user_id)
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="❌ 發生錯誤，請重新開始新增作業流程")]
+                    )
+                )
+            return True
+
+        # 更新截止日期
+        temp_task["due"] = text
+        set_temp_task(user_id, temp_task)
         
         # 顯示確認訊息
         bubble = {
@@ -827,7 +904,8 @@ def handle_add_task_flow(event, user_id, text):
                     {"type": "text", "text": "📝 確認新增作業", "weight": "bold", "size": "lg"},
                     {"type": "text", "text": f"作業名稱：{temp_task.get('task', '未設定')}", "size": "md"},
                     {"type": "text", "text": f"預估時間：{temp_task.get('estimated_time', 0)} 小時", "size": "md"},
-                    {"type": "text", "text": f"作業類型：{temp_task.get('category', '未設定')}", "size": "md"}
+                    {"type": "text", "text": f"作業類型：{temp_task.get('category', '未設定')}", "size": "md"},
+                    {"type": "text", "text": f"截止日期：{temp_task.get('due', '未設定')}", "size": "md"}
                 ]
             },
             "footer": {

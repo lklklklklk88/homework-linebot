@@ -1,5 +1,6 @@
 import os
 import datetime
+import logging
 from firebase_utils import (
     load_data, save_data, set_user_state, get_user_state,
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task,
@@ -15,6 +16,9 @@ from linebot.v3.messaging import ApiClient
 from linebot.v3.messaging import Configuration
 from linebot.models import TextSendMessage, FlexSendMessage
 from flex_utils import make_schedule_carousel
+
+# 設定 logger
+logger = logging.getLogger(__name__)
 
 configuration = Configuration(access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
 
@@ -214,6 +218,133 @@ def register_postback_handlers(handler):
                     )
                 return
 
+            # 處理選擇截止日期
+            if data == "select_task_due":
+                temp_task = get_temp_task(user_id)
+                if not temp_task:
+                    messages = [TextMessage(text="❌ 發生錯誤，請重新開始新增作業流程")]
+                else:
+                    # 顯示確認訊息
+                    bubble = {
+                        "type": "bubble",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "spacing": "md",
+                            "contents": [
+                                {"type": "text", "text": "📝 確認新增作業", "weight": "bold", "size": "lg"},
+                                {"type": "text", "text": f"作業名稱：{temp_task.get('task', '未設定')}", "size": "md"},
+                                {"type": "text", "text": f"預估時間：{temp_task.get('estimated_time', 0)} 小時", "size": "md"},
+                                {"type": "text", "text": f"作業類型：{temp_task.get('category', '未設定')}", "size": "md"},
+                                {"type": "text", "text": f"截止日期：{temp_task.get('due', '未設定')}", "size": "md"}
+                            ]
+                        },
+                        "footer": {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "spacing": "sm",
+                            "contents": [
+                                {
+                                    "type": "button",
+                                    "action": {
+                                        "type": "postback",
+                                        "label": "✅ 確認新增",
+                                        "data": "confirm_add_task"
+                                    },
+                                    "style": "primary"
+                                },
+                                {
+                                    "type": "button",
+                                    "action": {
+                                        "type": "postback",
+                                        "label": "❌ 取消",
+                                        "data": "cancel_add_task"
+                                    },
+                                    "style": "secondary"
+                                }
+                            ]
+                        }
+                    }
+                    
+                    messages = [FlexMessage(
+                        alt_text="確認新增作業",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=messages
+                        )
+                    )
+                return True
+
+            # 處理不設定截止日期
+            elif data == "no_due_date":
+                temp_task = get_temp_task(user_id)
+                if not temp_task:
+                    messages = [TextMessage(text="❌ 發生錯誤，請重新開始新增作業流程")]
+                else:
+                    temp_task["due"] = "未設定"
+                    set_temp_task(user_id, temp_task)
+                    
+                    # 顯示確認訊息
+                    bubble = {
+                        "type": "bubble",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "spacing": "md",
+                            "contents": [
+                                {"type": "text", "text": "📝 確認新增作業", "weight": "bold", "size": "lg"},
+                                {"type": "text", "text": f"作業名稱：{temp_task.get('task', '未設定')}", "size": "md"},
+                                {"type": "text", "text": f"預估時間：{temp_task.get('estimated_time', 0)} 小時", "size": "md"},
+                                {"type": "text", "text": f"作業類型：{temp_task.get('category', '未設定')}", "size": "md"},
+                                {"type": "text", "text": f"截止日期：{temp_task.get('due', '未設定')}", "size": "md"}
+                            ]
+                        },
+                        "footer": {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "spacing": "sm",
+                            "contents": [
+                                {
+                                    "type": "button",
+                                    "action": {
+                                        "type": "postback",
+                                        "label": "✅ 確認新增",
+                                        "data": "confirm_add_task"
+                                    },
+                                    "style": "primary"
+                                },
+                                {
+                                    "type": "button",
+                                    "action": {
+                                        "type": "postback",
+                                        "label": "❌ 取消",
+                                        "data": "cancel_add_task"
+                                    },
+                                    "style": "secondary"
+                                }
+                            ]
+                        }
+                    }
+                    
+                    messages = [FlexMessage(
+                        alt_text="確認新增作業",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=messages
+                        )
+                    )
+                return True
+
             # 處理完成作業
             if data.startswith("complete_task_"):
                 try:
@@ -255,6 +386,244 @@ def register_postback_handlers(handler):
                     messages = [
                         TextMessage(text="❌ 完成任務時發生錯誤，請稍後再試")
                     ]
+                    
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=messages
+                            )
+                        )
+                    return True
+
+            # 處理清除已完成作業
+            if data == "clear_completed_select":
+                tasks = load_data(user_id)
+                completed_tasks = [(i, task) for i, task in enumerate(tasks) if task.get("done", False)]
+                
+                if not completed_tasks:
+                    messages = [TextMessage(text="✅ 沒有已完成的作業需要清除。")]
+                else:
+                    buttons = []
+                    for i, task in completed_tasks:
+                        buttons.append({
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": f"🗑️ {task['task']}",
+                                "data": f"delete_completed_{i}"
+                            },
+                            "style": "secondary"
+                        })
+                    
+                    bubble = {
+                        "type": "bubble",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "spacing": "md",
+                            "contents": [
+                                {"type": "text", "text": "選擇要清除的已完成作業", "weight": "bold", "size": "lg"},
+                                *buttons
+                            ]
+                        }
+                    }
+                    
+                    messages = [FlexMessage(
+                        alt_text="選擇要清除的已完成作業",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=messages
+                        )
+                    )
+                return True
+
+            elif data == "clear_completed_all":
+                tasks = load_data(user_id)
+                remaining_tasks = [task for task in tasks if not task.get("done", False)]
+                save_data(remaining_tasks, user_id)
+                
+                messages = [TextMessage(text="✅ 已清除所有已完成的作業。")]
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=messages
+                        )
+                    )
+                return True
+
+            # 處理清除已截止作業
+            elif data == "clear_expired_select":
+                now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
+                tasks = load_data(user_id)
+                expired_tasks = []
+                
+                for i, task in enumerate(tasks):
+                    due = task.get("due", "未設定")
+                    done = task.get("done", False)
+                    if not done and due != "未設定":
+                        try:
+                            due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
+                            if due_date < now:
+                                expired_tasks.append((i, task))
+                        except:
+                            pass
+                
+                if not expired_tasks:
+                    messages = [TextMessage(text="✅ 沒有已截止的作業需要清除。")]
+                else:
+                    buttons = []
+                    for i, task in expired_tasks:
+                        buttons.append({
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": f"🗑️ {task['task']}",
+                                "data": f"delete_expired_{i}"
+                            },
+                            "style": "secondary"
+                        })
+                    
+                    bubble = {
+                        "type": "bubble",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "spacing": "md",
+                            "contents": [
+                                {"type": "text", "text": "選擇要清除的已截止作業", "weight": "bold", "size": "lg"},
+                                *buttons
+                            ]
+                        }
+                    }
+                    
+                    messages = [FlexMessage(
+                        alt_text="選擇要清除的已截止作業",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=messages
+                        )
+                    )
+                return True
+
+            elif data == "clear_expired_all":
+                now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
+                tasks = load_data(user_id)
+                remaining_tasks = []
+                
+                for task in tasks:
+                    due = task.get("due", "未設定")
+                    done = task.get("done", False)
+                    if done or due == "未設定":
+                        remaining_tasks.append(task)
+                    else:
+                        try:
+                            due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
+                            if due_date >= now:
+                                remaining_tasks.append(task)
+                        except:
+                            remaining_tasks.append(task)
+                
+                save_data(remaining_tasks, user_id)
+                
+                messages = [TextMessage(text="✅ 已清除所有已截止的作業。")]
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=messages
+                        )
+                    )
+                return True
+
+            # 處理刪除特定已完成作業
+            elif data.startswith("delete_completed_"):
+                try:
+                    task_index = int(data.split("_")[-1])
+                    tasks = load_data(user_id)
+                    
+                    if 0 <= task_index < len(tasks) and tasks[task_index].get("done", False):
+                        task_name = tasks[task_index]["task"]
+                        del tasks[task_index]
+                        save_data(tasks, user_id)
+                        
+                        messages = [TextMessage(text=f"✅ 已清除已完成作業：{task_name}")]
+                    else:
+                        messages = [TextMessage(text="❌ 無效的作業索引")]
+                    
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=messages
+                            )
+                        )
+                    return True
+                except Exception as e:
+                    print(f"刪除已完成作業時發生錯誤：{str(e)}")
+                    messages = [TextMessage(text="❌ 刪除作業時發生錯誤，請稍後再試")]
+                    
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=messages
+                            )
+                        )
+                    return True
+
+            # 處理刪除特定已截止作業
+            elif data.startswith("delete_expired_"):
+                try:
+                    task_index = int(data.split("_")[-1])
+                    tasks = load_data(user_id)
+                    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
+                    
+                    if 0 <= task_index < len(tasks):
+                        task = tasks[task_index]
+                        due = task.get("due", "未設定")
+                        done = task.get("done", False)
+                        
+                        if not done and due != "未設定":
+                            try:
+                                due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
+                                if due_date < now:
+                                    task_name = task["task"]
+                                    del tasks[task_index]
+                                    save_data(tasks, user_id)
+                                    
+                                    messages = [TextMessage(text=f"✅ 已清除已截止作業：{task_name}")]
+                                else:
+                                    messages = [TextMessage(text="❌ 該作業尚未截止")]
+                            except:
+                                messages = [TextMessage(text="❌ 日期格式錯誤")]
+                        else:
+                            messages = [TextMessage(text="❌ 該作業未截止或已完成")]
+                    else:
+                        messages = [TextMessage(text="❌ 無效的作業索引")]
+                    
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=messages
+                            )
+                        )
+                    return True
+                except Exception as e:
+                    print(f"刪除已截止作業時發生錯誤：{str(e)}")
+                    messages = [TextMessage(text="❌ 刪除作業時發生錯誤，請稍後再試")]
                     
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(
