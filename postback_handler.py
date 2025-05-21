@@ -302,6 +302,23 @@ def handle_postback(event):
         data = event.postback.data
         user_id = event.source.user_id
         
+        # 處理取消操作
+        if data == "cancel_add_task":
+            clear_temp_task(user_id)
+            clear_user_state(user_id)
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="❌ 已取消新增作業")]
+                    )
+                )
+            return
+        
+        # 處理新增作業相關的 postback
+        if handle_add_task_postback(event, data):
+            return
+            
         # 解析動作類型和任務名稱
         action_type, task_name = parse_postback_data(data)
         if not action_type or not task_name:
