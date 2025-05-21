@@ -95,14 +95,10 @@ def make_timetable_card(blocks, total_hours):
     for block in blocks:
         time_range = f"{block['start']} ~ {block['end']}"
         task_text = block['task']
-        duration = block.get('duration', '')
-        category = block.get('category', '')
         emoji = block.get('emoji', '🕘')
         
-        # 組合任務文字
+        # 組合任務文字，只顯示時間和任務名稱
         task_display = f"{emoji} {time_range}｜{task_text}"
-        if category and category != "未分類":
-            task_display += f"｜{category}"
 
         rows.append({
             "type": "box",
@@ -110,7 +106,7 @@ def make_timetable_card(blocks, total_hours):
             "contents": [
                 {
                     "type": "text",
-                    "text": f"{task_display}（{duration}）",
+                    "text": task_display,
                     "size": "sm",
                     "wrap": True,
                     "color": "#111111"
