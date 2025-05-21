@@ -826,8 +826,12 @@ def handle_add_task_flow(event, user_id, text):
                 "layout": "vertical",
                 "spacing": "md",
                 "contents": [
-                    {"type": "text", "text": "📅 請選擇截止日期", "weight": "bold", "size": "lg"},
-                    {"type": "text", "text": "或選擇不設定截止日期", "size": "sm", "color": "#888888"},
+                    {"type": "text", "text": "📝 作業資訊", "weight": "bold", "size": "lg"},
+                    {"type": "text", "text": f"作業名稱：{temp_task.get('task', '未設定')}", "size": "md"},
+                    {"type": "text", "text": f"預估時間：{temp_task.get('estimated_time', 0)} 小時", "size": "md"},
+                    {"type": "text", "text": f"作業類型：{temp_task.get('category', '未設定')}", "size": "md"},
+                    {"type": "separator"},
+                    {"type": "text", "text": "📅 請選擇截止日期", "weight": "bold", "size": "md"},
                     {
                         "type": "button",
                         "action": {

@@ -71,6 +71,10 @@ def register_postback_handlers(handler):
                     return
 
                 try:
+                    # 確保 estimated_time 是數字
+                    if isinstance(temp_task["estimated_time"], str):
+                        temp_task["estimated_time"] = float(temp_task["estimated_time"])
+                    
                     # 更新歷史記錄
                     print(f"更新歷史記錄：{temp_task}")  # 新增日誌
                     update_task_history(user_id, temp_task["task"], temp_task["category"], temp_task["estimated_time"])
