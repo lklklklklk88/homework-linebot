@@ -761,6 +761,33 @@ def handle_add_task_flow(event, user_id, text):
             return True
         except:
             # 如果輸入的不是有效數字，顯示時間選擇卡片
+            # 獲取歷史記錄
+            name_history, _ = get_task_history(user_id)
+            
+            # 建立歷史記錄按鈕
+            buttons = []
+            for name in name_history[-3:]:  # 最多顯示3個
+                buttons.append({
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": name,
+                        "data": f"select_task_name_{name}"
+                    },
+                    "style": "secondary"
+                })
+            
+            # 添加取消按鈕
+            buttons.append({
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": "❌ 取消",
+                    "data": "cancel_add_task"
+                },
+                "style": "secondary"
+            })
+
             bubble = {
                 "type": "bubble",
                 "body": {
@@ -769,16 +796,8 @@ def handle_add_task_flow(event, user_id, text):
                     "spacing": "md",
                     "contents": [
                         {"type": "text", "text": "⏰ 請輸入預估完成時間", "weight": "bold", "size": "lg"},
-                        {"type": "text", "text": "請輸入數字（例如：1.5 小時）", "size": "sm", "color": "#888888"},
-                        {
-                            "type": "button",
-                            "action": {
-                                "type": "postback",
-                                "label": "❌ 取消",
-                                "data": "cancel_add_task"
-                            },
-                            "style": "secondary"
-                        }
+                        {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
+                        *buttons
                     ]
                 }
             }
@@ -788,7 +807,7 @@ def handle_add_task_flow(event, user_id, text):
                     alt_text="請輸入預估完成時間",
                     contents=FlexContainer.from_dict(bubble)
                 ),
-                TextMessage(text="請輸入預估完成時間（小時），例如：1.5")
+                TextMessage(text="請輸入預估完成時間（小時），或從歷史記錄中選擇")
             ]
 
             with ApiClient(configuration) as api_client:
