@@ -15,7 +15,7 @@ def extract_schedule_blocks(text):
     print("開始解析排程文字：", text)
     
     # 匹配新格式（更寬鬆的匹配）
-    pattern = re.compile(r'\d+\.\s*([^\s]+)?\s*(\d{1,2}:\d{2})\s*[~-]\s*(\d{1,2}:\d{2})\s*[｜|]\s*(.+?)(?:\s*[（(](\d+)分鐘[）)])?')
+    pattern = re.compile(r'\d+\.\s*([^\s]+)?\s*(\d{1,2}:\d{2})\s*[~-]\s*(\d{1,2}:\d{2})\s*[｜|]\s*([^（(]+?)(?:\s*[（(](\d+)分鐘[）)])?')
     matches = pattern.findall(text)
     
     print("匹配結果：", matches)
@@ -48,18 +48,21 @@ def extract_schedule_blocks(text):
         return blocks
     
     # 如果沒有匹配到新格式，嘗試更簡單的格式
-    pattern_simple = re.compile(r'\d+\.\s*(\d{1,2}:\d{2})\s*[~-]\s*(\d{1,2}:\d{2})\s*(.+)')
+    pattern_simple = re.compile(r'\d+\.\s*(\d{1,2}:\d{2})\s*[~-]\s*(\d{1,2}:\d{2})\s*[｜|]\s*([^（(]+?)(?:\s*[（(](\d+)分鐘[）)])?')
     matches_simple = pattern_simple.findall(text)
     
     if matches_simple:
-        for start, end, task in matches_simple:
+        for start, end, task, duration in matches_simple:
             # 計算時長
-            try:
-                start_time = datetime.datetime.strptime(start, "%H:%M")
-                end_time = datetime.datetime.strptime(end, "%H:%M")
-                duration_minutes = int((end_time - start_time).total_seconds() / 60)
-            except:
-                duration_minutes = 0
+            if not duration:
+                try:
+                    start_time = datetime.datetime.strptime(start, "%H:%M")
+                    end_time = datetime.datetime.strptime(end, "%H:%M")
+                    duration_minutes = int((end_time - start_time).total_seconds() / 60)
+                except:
+                    duration_minutes = 0
+            else:
+                duration_minutes = int(duration)
             
             blocks.append({
                 'start': start,
