@@ -563,9 +563,10 @@ def handle_add_task_flow(event, user_id, text):
     if text == "新增作業":
         # 第一步：輸入作業名稱
         set_user_state(user_id, "awaiting_task_name")
+        clear_temp_task(user_id)  # 清除之前的暫存資料
         
         # 獲取歷史記錄
-        name_history, _ = get_task_history(user_id)
+        name_history, _, _ = get_task_history(user_id)
         
         # 建立歷史記錄按鈕
         buttons = []
@@ -700,7 +701,7 @@ def handle_add_task_flow(event, user_id, text):
             set_user_state(user_id, "awaiting_task_type")
             
             # 第三步：選擇作業類型
-            _, type_history, time_history = get_task_history(user_id)
+            _, type_history, _ = get_task_history(user_id)
             
             buttons = []
             for task_type in type_history[-3:]:  # 最多顯示3個

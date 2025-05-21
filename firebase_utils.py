@@ -109,7 +109,7 @@ def get_task_history(user_id):
     獲取作業名稱歷史記錄
     """
     ref = db.reference(f"users/{user_id}/task_history")
-    history = ref.get() or {}
+    history = ref.get() or {"names": [], "types": [], "times": []}
     return history.get("names", []), history.get("types", []), history.get("times", [])
 
 def update_task_history(user_id, task_name, task_type, estimated_time):
@@ -118,6 +118,14 @@ def update_task_history(user_id, task_name, task_type, estimated_time):
     """
     ref = db.reference(f"users/{user_id}/task_history")
     history = ref.get() or {"names": [], "types": [], "times": []}
+    
+    # 確保所有必要的鍵都存在
+    if "names" not in history:
+        history["names"] = []
+    if "types" not in history:
+        history["types"] = []
+    if "times" not in history:
+        history["times"] = []
     
     # 更新名稱歷史
     if task_name not in history["names"]:
