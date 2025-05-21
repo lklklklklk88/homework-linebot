@@ -187,53 +187,23 @@ def register_message_handlers(handler):
             return
         
         elif text == "今日排程":
-            tasks = load_data(user_id)
-            if not tasks:
-                reply = "😅 目前沒有任何未完成的作業可以排程喔～請先新增作業！"
+            response = get_today_schedule_for_user(user_id)
+            if isinstance(response, list):
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(
                         ReplyMessageRequest(
                             reply_token=event.reply_token,
-                            messages=[TextMessage(text=reply)]
+                            messages=response
                         )
                     )
-                return
-
-            schedule = get_today_schedule_for_user(user_id)
-            
-            # 確保有排程內容
-            if not schedule["timetable_card"]:
-                reply = "😅 抱歉，目前無法生成排程，請稍後再試！"
+            else:
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(
                         ReplyMessageRequest(
                             reply_token=event.reply_token,
-                            messages=[TextMessage(text=reply)]
+                            messages=[TextMessage(text=response)]
                         )
                     )
-                return
-
-            # 發送說明文字和排程表格
-            messages = []
-            
-            # 添加說明文字
-            if schedule["text_summary"]:
-                messages.append(TextMessage(text=schedule["text_summary"]))
-            
-            # 添加排程表格
-            messages.append(FlexMessage(
-                alt_text="📅 今日排程",
-                contents=FlexContainer.from_dict(schedule["timetable_card"])
-            ))
-
-            # 發送訊息
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=messages
-                    )
-                )
             return
 
         elif text == "提醒時間":
@@ -471,21 +441,12 @@ def register_message_handlers(handler):
             return
 
         elif text == "查看進度":
-            progress = get_weekly_progress(user_id)
-            card = make_weekly_progress_card(
-                progress["completed_tasks"],
-                progress["total_hours"],
-                progress["avg_hours_per_day"]
-            )
-            
+            response = get_weekly_progress_for_user(user_id)
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[FlexMessage(
-                            alt_text="本週進度",
-                            contents=FlexContainer.from_dict(card)
-                        )]
+                        messages=[response]
                     )
                 )
             return
@@ -565,41 +526,87 @@ def register_message_handlers(handler):
         return
 
 def get_today_schedule_for_user(user_id):
-    tasks = load_data(user_id)
-    habits = {
-        "prefered_morning": "閱讀、寫作",
-        "prefered_afternoon": "計算、邏輯"
-    }
-    today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
-    available_hours = 5
+    """
+    獲取用戶今日排程
+    """
+    try:
+        # 獲取用戶資料
+        tasks = load_data(user_id)
+        habits = {
+            "prefered_morning": "閱讀、寫作",
+            "prefered_afternoon": "計算、邏輯"
+        }
+        today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+        available_hours = 5
 
-    prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
-    raw_text = call_gemini_schedule(prompt)
+        prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
+        raw_text = call_gemini_schedule(prompt)
 
-    # 分離說明文字和時間表
-    explanation = ""
-    schedule_text = ""
-    total_hours = 0
+        # 解析回應
+        explanation, schedule_text, total_hours = parse_schedule_response(raw_text)
+        
+        # 生成時間表卡片
+        blocks = extract_schedule_blocks(schedule_text)
+        timetable_card = make_timetable_card(blocks, total_hours)
+        
+        # 組合回應
+        messages = []
+        if explanation:
+            messages.append(TextMessage(text=explanation))
+        if timetable_card:
+            messages.append(FlexMessage(
+                alt_text="📅 今日排程",
+                contents=FlexContainer.from_dict(timetable_card)
+            ))
+        
+        return messages if messages else "抱歉，無法生成排程，請稍後再試。"
+        
+    except Exception as e:
+        print(f"生成排程時發生錯誤：{str(e)}")
+        return "抱歉，生成排程時發生錯誤，請稍後再試。"
+
+def get_weekly_progress_for_user(user_id):
+    """
+    獲取用戶週進度
+    """
+    try:
+        progress = get_weekly_progress(user_id)
+        if not progress:
+            return "本週還沒有完成任何任務喔！"
+        
+        card = make_weekly_progress_card(
+            completed_tasks=progress.get("completed_tasks", 0),
+            total_hours=progress.get("total_hours", 0),
+            avg_hours_per_day=progress.get("avg_hours_per_day", 0)
+        )
+        
+        return FlexMessage(
+            alt_text="本週進度",
+            contents=FlexContainer.from_dict(card)
+        )
+        
+    except Exception as e:
+        print(f"獲取週進度時發生錯誤：{str(e)}")
+        return "抱歉，獲取週進度時發生錯誤，請稍後再試。"
+
+def parse_schedule_response(raw_text):
+    """
+    解析排程回應
+    """
+    print("原始回應：", raw_text)
     
-    # 檢查是否包含時間表標記
+    # 檢查是否包含排程標記
     if "📅 今日排程" in raw_text:
         parts = raw_text.split("📅 今日排程")
-        # 提取說明和溫馨提醒
-        explanation_parts = parts[0].split("💡 溫馨提醒：")
-        explanation = explanation_parts[0].replace("📝 排程說明：", "").strip()
-        if len(explanation_parts) > 1:
-            explanation += "\n\n💡 溫馨提醒：\n" + explanation_parts[1].strip()
+        explanation = parts[0].strip()
+        schedule_text = "📅 今日排程" + parts[1].strip()
         
-        schedule_text = parts[1].strip()
-        
-        # 提取總時數
-        if "✅ 今日總時長：" in schedule_text:
-            total_parts = schedule_text.split("✅ 今日總時長：")
-            schedule_text = total_parts[0].strip()
-            total_hours = float(total_parts[1].split("小時")[0].strip())
+        # 從排程文字中提取總時數
+        total_hours_match = re.search(r'✅ 今日總時長：(\d+(?:\.\d+)?)', raw_text)
+        total_hours = float(total_hours_match.group(1)) if total_hours_match else 0
     else:
-        # 如果沒有找到時間表標記，嘗試直接解析
-        lines = raw_text.split('\n')
+        # 如果沒有標記，嘗試直接解析
+        lines = raw_text.strip().split('\n')
         schedule_lines = []
         explanation_lines = []
         
@@ -616,19 +623,7 @@ def get_today_schedule_for_user(user_id):
         blocks = extract_schedule_blocks(schedule_text)
         total_hours = sum(float(block['duration'].replace('分鐘', '')) / 60 for block in blocks)
 
-    blocks = extract_schedule_blocks(schedule_text)
-    
-    # 調試訊息
-    print("原始回應：", raw_text)
-    print("排程文字：", schedule_text)
-    print("解析出的區塊：", blocks)
-    
-    schedule_card = make_timetable_card(blocks, total_hours) if blocks else None
-
-    return {
-        "text_summary": explanation,
-        "timetable_card": schedule_card
-    }
+    return explanation, schedule_text, total_hours
 
 def get_weekly_progress(user_id):
     """

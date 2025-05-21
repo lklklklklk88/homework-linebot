@@ -1,6 +1,31 @@
 import re
 import datetime
 
+# 常數定義
+TIME_RANGE_PATTERN = r'\d+\.\s*([^\s]+)?\s*(\d{1,2}:\d{2})\s*[~-]\s*(\d{1,2}:\d{2})\s*[｜|]\s*(.*?)(?:\s*[（(](\d+)分鐘[）)])?$'
+EMOJI_MAP = {
+    'default': '🕘',
+    'meal': '🥪',
+    'study': '📖',
+    'rest': '🧠',
+    'coding': '💻',
+    'writing': '✍️',
+    'reading': '📚',
+    'exercise': '🏃',
+    'meeting': '👥'
+}
+
+def calculate_duration(start, end):
+    """
+    計算時間區間的持續時間（分鐘）
+    """
+    try:
+        start_time = datetime.datetime.strptime(start, "%H:%M")
+        end_time = datetime.datetime.strptime(end, "%H:%M")
+        return int((end_time - start_time).total_seconds() / 60)
+    except:
+        return 0
+
 def extract_schedule_blocks(text):
     """
     從 Gemini 回傳文字中擷取時間表內容
@@ -23,7 +48,7 @@ def extract_schedule_blocks(text):
             continue
             
         # 匹配新格式
-        pattern = re.compile(r'\d+\.\s*([^\s]+)?\s*(\d{1,2}:\d{2})\s*[~-]\s*(\d{1,2}:\d{2})\s*[｜|]\s*(.*?)(?:\s*[（(](\d+)分鐘[）)])?$')
+        pattern = re.compile(TIME_RANGE_PATTERN)
         match = pattern.search(line)
         
         if match:
@@ -36,13 +61,7 @@ def extract_schedule_blocks(text):
             
             # 如果沒有找到時長，計算時長
             if not duration:
-                try:
-                    start_time = datetime.datetime.strptime(start, "%H:%M")
-                    end_time = datetime.datetime.strptime(end, "%H:%M")
-                    duration_minutes = int((end_time - start_time).total_seconds() / 60)
-                    duration = str(duration_minutes)
-                except:
-                    duration = "0"
+                duration = str(calculate_duration(start, end))
             
             blocks.append({
                 'start': start,
@@ -50,7 +69,7 @@ def extract_schedule_blocks(text):
                 'task': task_name,
                 'duration': f"{duration}分鐘",
                 'category': category,
-                'emoji': emoji if emoji else "🕘"
+                'emoji': emoji if emoji else EMOJI_MAP['default']
             })
             continue
             
@@ -63,22 +82,15 @@ def extract_schedule_blocks(text):
             
             # 計算時長
             if not duration:
-                try:
-                    start_time = datetime.datetime.strptime(start, "%H:%M")
-                    end_time = datetime.datetime.strptime(end, "%H:%M")
-                    duration_minutes = int((end_time - start_time).total_seconds() / 60)
-                except:
-                    duration_minutes = 0
-            else:
-                duration_minutes = int(duration)
+                duration = str(calculate_duration(start, end))
             
             blocks.append({
                 'start': start,
                 'end': end,
                 'task': task.strip(),
-                'duration': f"{duration_minutes}分鐘",
+                'duration': f"{duration}分鐘",
                 'category': "未分類",
-                'emoji': "🕘"
+                'emoji': EMOJI_MAP['default']
             })
     
     print("解析結果：", blocks)
@@ -95,7 +107,7 @@ def make_timetable_card(blocks, total_hours):
     for block in blocks:
         time_range = f"{block['start']} ~ {block['end']}"
         task_text = block['task']
-        emoji = block.get('emoji', '🕘')
+        emoji = block.get('emoji', EMOJI_MAP['default'])
         
         # 組合任務文字，只顯示時間和任務名稱
         task_display = f"{emoji} {time_range}｜{task_text}"

@@ -2,7 +2,8 @@ import os
 import datetime
 from firebase_utils import (
     load_data, save_data, set_user_state, get_user_state,
-    clear_user_state, set_temp_task, get_temp_task, clear_temp_task
+    clear_user_state, set_temp_task, get_temp_task, clear_temp_task,
+    update_task_status, delete_task, delay_task
 )
 from firebase_admin import db
 
@@ -11,8 +12,17 @@ from linebot.v3.messaging import MessagingApi, ReplyMessageRequest
 from linebot.v3.messaging.models import TextMessage, FlexMessage, FlexContainer
 from linebot.v3.messaging import ApiClient
 from linebot.v3.messaging import Configuration
+from linebot.models import TextSendMessage, FlexSendMessage
+from flex_utils import make_schedule_carousel
 
 configuration = Configuration(access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
+
+# 常數定義
+ACTION_TYPES = {
+    'done': '完成',
+    'delete': '刪除',
+    'delay': '延後'
+}
 
 def register_postback_handlers(handler):
     @handler.add(PostbackEvent)
@@ -282,3 +292,84 @@ def register_postback_handlers(handler):
                 )
             )
         return
+
+def handle_postback(event):
+    """
+    處理回傳事件
+    """
+    try:
+        data = event.postback.data
+        user_id = event.source.user_id
+        
+        # 解析動作類型和任務名稱
+        action_type, task_name = parse_postback_data(data)
+        if not action_type or not task_name:
+            return TextSendMessage(text="無效的操作，請重試。")
+        
+        # 根據動作類型處理
+        if action_type == 'done':
+            return handle_task_completion(user_id, task_name)
+        elif action_type == 'delete':
+            return handle_task_deletion(user_id, task_name)
+        elif action_type == 'delay':
+            return handle_task_delay(user_id, task_name)
+        else:
+            return TextSendMessage(text="不支援的操作類型。")
+            
+    except Exception as e:
+        print(f"處理回傳事件時發生錯誤：{str(e)}")
+        return TextSendMessage(text="處理操作時發生錯誤，請稍後再試。")
+
+def parse_postback_data(data):
+    """
+    解析回傳資料
+    """
+    try:
+        parts = data.split('_', 1)
+        if len(parts) != 2:
+            return None, None
+        return parts[0], parts[1]
+    except:
+        return None, None
+
+def handle_task_completion(user_id, task_name):
+    """
+    處理任務完成
+    """
+    try:
+        success = update_task_status(user_id, task_name, "completed")
+        if success:
+            return TextSendMessage(text=f"✅ 恭喜完成任務：{task_name}")
+        else:
+            return TextSendMessage(text="更新任務狀態失敗，請稍後再試。")
+    except Exception as e:
+        print(f"處理任務完成時發生錯誤：{str(e)}")
+        return TextSendMessage(text="處理任務完成時發生錯誤，請稍後再試。")
+
+def handle_task_deletion(user_id, task_name):
+    """
+    處理任務刪除
+    """
+    try:
+        success = delete_task(user_id, task_name)
+        if success:
+            return TextSendMessage(text=f"🗑️ 已刪除任務：{task_name}")
+        else:
+            return TextSendMessage(text="刪除任務失敗，請稍後再試。")
+    except Exception as e:
+        print(f"處理任務刪除時發生錯誤：{str(e)}")
+        return TextSendMessage(text="處理任務刪除時發生錯誤，請稍後再試。")
+
+def handle_task_delay(user_id, task_name):
+    """
+    處理任務延後
+    """
+    try:
+        success = delay_task(user_id, task_name)
+        if success:
+            return TextSendMessage(text=f"⏰ 已延後任務：{task_name}")
+        else:
+            return TextSendMessage(text="延後任務失敗，請稍後再試。")
+    except Exception as e:
+        print(f"處理任務延後時發生錯誤：{str(e)}")
+        return TextSendMessage(text="處理任務延後時發生錯誤，請稍後再試。")
