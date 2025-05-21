@@ -674,16 +674,6 @@ def handle_add_task_flow(event, user_id, text):
                     {
                         "type": "button",
                         "action": {
-                            "type": "datetimepicker",
-                            "label": "⏰ 自訂時間",
-                            "data": "select_time_custom",
-                            "mode": "time"
-                        },
-                        "style": "primary"
-                    },
-                    {
-                        "type": "button",
-                        "action": {
                             "type": "postback",
                             "label": "❌ 取消",
                             "data": "cancel_add_task"
@@ -694,14 +684,19 @@ def handle_add_task_flow(event, user_id, text):
             }
         }
 
+        messages = [
+            FlexMessage(
+                alt_text="選擇預估時間",
+                contents=FlexContainer.from_dict(bubble)
+            ),
+            TextMessage(text="請輸入預估時間（小時），或從選項中選擇")
+        ]
+
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[FlexMessage(
-                        alt_text="選擇預估時間",
-                        contents=FlexContainer.from_dict(bubble)
-                    )]
+                    messages=messages
                 )
             )
         return True

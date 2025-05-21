@@ -32,10 +32,14 @@ def register_postback_handlers(handler):
             data = event.postback.data
             user_id = event.source.user_id
             
+            print(f"收到 postback 事件：{data}")  # 新增日誌
+            
             # 處理確認新增作業
             if data == "confirm_add_task":
+                print("處理確認新增作業")  # 新增日誌
                 temp_task = get_temp_task(user_id)
                 if not temp_task:
+                    print("找不到暫存任務")  # 新增日誌
                     reply = "⚠️ 發生錯誤，請重新開始新增作業流程"
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(
@@ -46,25 +50,33 @@ def register_postback_handlers(handler):
                         )
                     return
 
-                # 更新歷史記錄
-                update_task_history(user_id, temp_task["task"], temp_task["category"])
-                
-                # 新增作業
-                add_task(user_id, temp_task)
-                
-                # 清除暫存資料
-                clear_temp_task(user_id)
-                set_user_state(user_id, None)
-                
-                reply = "✅ 作業已成功新增！"
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[TextMessage(text=reply)]
+                try:
+                    # 更新歷史記錄
+                    print(f"更新歷史記錄：{temp_task}")  # 新增日誌
+                    update_task_history(user_id, temp_task["task"], temp_task["category"])
+                    
+                    # 新增作業
+                    print("新增作業到資料庫")  # 新增日誌
+                    success = add_task(user_id, temp_task)
+                    if not success:
+                        raise Exception("新增作業失敗")
+                    
+                    # 清除暫存資料
+                    clear_temp_task(user_id)
+                    set_user_state(user_id, None)
+                    
+                    reply = "✅ 作業已成功新增！"
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
                         )
-                    )
-                return
+                    return
+                except Exception as e:
+                    print(f"處理確認新增作業時發生錯誤：{str(e)}")  # 新增日誌
+                    raise e
 
             # 處理取消操作
             if data == "cancel_add_task":
@@ -160,9 +172,6 @@ def register_postback_handlers(handler):
             # 處理選擇時間
             if data.startswith("select_time_"):
                 time_str = data.replace("select_time_", "")
-                if time_str == "custom":
-                    return  # 自訂時間會在 datetimepicker 事件中處理
-                
                 hours = float(time_str) / 60  # 轉換為小時
                 temp_task = get_temp_task(user_id)
                 temp_task["estimated_time"] = hours
@@ -317,6 +326,8 @@ def register_postback_handlers(handler):
                 
         except Exception as e:
             print(f"處理回傳事件時發生錯誤：{str(e)}")
+            print(f"錯誤類型：{type(e)}")  # 新增日誌
+            print(f"錯誤詳情：{str(e)}")  # 新增日誌
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
                     ReplyMessageRequest(
