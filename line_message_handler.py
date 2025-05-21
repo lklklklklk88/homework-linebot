@@ -553,6 +553,19 @@ def handle_add_task_flow(event, user_id, text):
     state = get_user_state(user_id)
     temp_task = get_temp_task(user_id)
 
+    # 處理取消操作
+    if text == "取消":
+        clear_temp_task(user_id)
+        clear_user_state(user_id)
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="❌ 已取消新增作業")]
+                )
+            )
+        return True
+
     if text == "新增作業":
         # 第一步：輸入作業名稱
         set_user_state(user_id, "awaiting_task_name")
@@ -618,18 +631,6 @@ def handle_add_task_flow(event, user_id, text):
 
     elif state == "awaiting_task_name":
         # 處理手動輸入的作業名稱
-        if text == "取消":
-            clear_temp_task(user_id)
-            clear_user_state(user_id)
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text="❌ 已取消新增作業")]
-                    )
-                )
-            return True
-            
         temp_task = {"task": text}  # 創建新的任務字典
         set_temp_task(user_id, temp_task)
         set_user_state(user_id, "awaiting_task_time")
