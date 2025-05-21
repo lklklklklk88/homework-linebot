@@ -692,6 +692,9 @@ def handle_add_task_flow(event, user_id, text):
         # 處理手動輸入的時間
         try:
             hours = float(text)
+            temp_task = get_temp_task(user_id)  # 重新獲取臨時任務
+            if not temp_task:
+                temp_task = {}
             temp_task["estimated_time"] = hours
             set_temp_task(user_id, temp_task)
             set_user_state(user_id, "awaiting_task_type")
@@ -752,35 +755,8 @@ def handle_add_task_flow(event, user_id, text):
                     )
                 )
             return True
-        except:
-            # 如果輸入的不是有效數字，顯示時間選擇卡片
-            # 獲取歷史記錄
-            name_history, _ = get_task_history(user_id)
-            
-            # 建立歷史記錄按鈕
-            buttons = []
-            for name in name_history[-3:]:  # 最多顯示3個
-                buttons.append({
-                    "type": "button",
-                    "action": {
-                        "type": "postback",
-                        "label": name,
-                        "data": f"select_task_name_{name}"
-                    },
-                    "style": "secondary"
-                })
-            
-            # 添加取消按鈕
-            buttons.append({
-                "type": "button",
-                "action": {
-                    "type": "postback",
-                    "label": "❌ 取消",
-                    "data": "cancel_add_task"
-                },
-                "style": "secondary"
-            })
-
+        except ValueError:
+            # 如果輸入的不是有效數字，顯示錯誤訊息
             bubble = {
                 "type": "bubble",
                 "body": {
@@ -788,19 +764,27 @@ def handle_add_task_flow(event, user_id, text):
                     "layout": "vertical",
                     "spacing": "md",
                     "contents": [
-                        {"type": "text", "text": "⏰ 請輸入預估完成時間", "weight": "bold", "size": "lg"},
-                        {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
-                        *buttons
+                        {"type": "text", "text": "⚠️ 請輸入有效的數字", "weight": "bold", "size": "lg"},
+                        {"type": "text", "text": "請輸入預估完成時間（小時），例如：1.5", "size": "sm", "color": "#888888"},
+                        {
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": "❌ 取消",
+                                "data": "cancel_add_task"
+                            },
+                            "style": "secondary"
+                        }
                     ]
                 }
             }
 
             messages = [
                 FlexMessage(
-                    alt_text="請輸入預估完成時間",
+                    alt_text="請輸入有效的數字",
                     contents=FlexContainer.from_dict(bubble)
                 ),
-                TextMessage(text="請輸入預估完成時間（小時），或從歷史記錄中選擇")
+                TextMessage(text="請輸入預估完成時間（小時），例如：1.5")
             ]
 
             with ApiClient(configuration) as api_client:

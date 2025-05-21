@@ -214,6 +214,57 @@ def register_postback_handlers(handler):
                     )
                 return
 
+            # 處理完成作業
+            if data.startswith("complete_task_"):
+                try:
+                    task_index = int(data.split("_")[-1])
+                    tasks = load_data(user_id)
+                    
+                    if 0 <= task_index < len(tasks):
+                        tasks[task_index]["done"] = True
+                        save_data(tasks, user_id)
+                        
+                        # 發送確認訊息
+                        messages = [
+                            TextMessage(text=f"✅ 已完成任務：{tasks[task_index]['task']}")
+                        ]
+                        
+                        with ApiClient(configuration) as api_client:
+                            MessagingApi(api_client).reply_message(
+                                ReplyMessageRequest(
+                                    reply_token=event.reply_token,
+                                    messages=messages
+                                )
+                            )
+                        return True
+                    else:
+                        messages = [
+                            TextMessage(text="❌ 無效的任務索引")
+                        ]
+                        
+                        with ApiClient(configuration) as api_client:
+                            MessagingApi(api_client).reply_message(
+                                ReplyMessageRequest(
+                                    reply_token=event.reply_token,
+                                    messages=messages
+                                )
+                            )
+                        return True
+                except Exception as e:
+                    logger.error(f"完成任務時發生錯誤: {str(e)}")
+                    messages = [
+                        TextMessage(text="❌ 完成任務時發生錯誤，請稍後再試")
+                    ]
+                    
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=messages
+                            )
+                        )
+                    return True
+
             # 處理其他 postback 事件
             action_type, task_name = parse_postback_data(data)
             if not action_type or not task_name:
