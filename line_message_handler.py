@@ -9,7 +9,7 @@ from firebase_utils import (
 from flex_utils import make_schedule_carousel, extract_schedule_blocks, make_timetable_card, make_weekly_progress_card
 from firebase_admin import db
 from gemini_client import call_gemini_schedule
-from scheduler import generate_gemini_prompt
+from scheduler import generate_schedule_prompt
 
 from linebot.v3.webhook import MessageEvent
 from linebot.v3.messaging import MessagingApi, ReplyMessageRequest, ApiClient, Configuration
@@ -539,7 +539,7 @@ def get_today_schedule_for_user(user_id):
         today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
         available_hours = 5
 
-        prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
+        prompt = generate_schedule_prompt(user_id, tasks, habits, today, available_hours)
         raw_text = call_gemini_schedule(prompt)
 
         # 解析回應
