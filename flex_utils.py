@@ -81,23 +81,13 @@ def make_timetable_card(blocks, total_hours):
         return None
 
     rows = []
-    for idx, block in enumerate(blocks, start=1):
+    for block in blocks:
         time_range = f"{block['start']} ~ {block['end']}"
         task_text = block['task']
         duration = block.get('duration', '')
         category = block.get('category', '')
+        emoji = block.get('emoji', '🕘')
         
-        # 根據任務類型選擇表情符號
-        emoji = "🕘"  # 預設
-        if "休息" in task_text:
-            emoji = "🧠"
-        elif "午餐" in task_text:
-            emoji = "🥪"
-        elif "閱讀" in category:
-            emoji = "📖"
-        elif "寫程式" in category:
-            emoji = "💻"
-
         # 組合任務文字
         task_display = f"{emoji} {time_range}｜{task_text}"
         if category and category != "未分類":
@@ -109,16 +99,8 @@ def make_timetable_card(blocks, total_hours):
             "contents": [
                 {
                     "type": "text",
-                    "text": f"{idx}.",
-                    "size": "sm",
-                    "flex": 1,
-                    "color": "#666666"
-                },
-                {
-                    "type": "text",
                     "text": f"{task_display}（{duration}）",
                     "size": "sm",
-                    "flex": 9,
                     "wrap": True,
                     "color": "#111111"
                 }
