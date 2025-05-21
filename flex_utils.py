@@ -27,7 +27,8 @@ def extract_schedule_blocks(text):
                 'end': end,
                 'task': task_name,
                 'duration': f"{duration}分鐘",
-                'category': category
+                'category': category,
+                'emoji': emoji
             })
         return blocks
     
@@ -42,7 +43,8 @@ def extract_schedule_blocks(text):
                 'end': end,
                 'task': task,
                 'duration': f"{duration}分鐘",
-                'category': category
+                'category': category,
+                'emoji': "🕘"  # 預設表情符號
             })
         return blocks
     
@@ -52,6 +54,9 @@ def make_timetable_card(blocks, total_hours):
     """
     製作時間表卡片，使用簡潔的表格格式
     """
+    if not blocks:
+        return None
+
     rows = []
     for idx, block in enumerate(blocks, start=1):
         time_range = f"{block['start']} ~ {block['end']}"
@@ -70,6 +75,11 @@ def make_timetable_card(blocks, total_hours):
         elif "寫程式" in category:
             emoji = "💻"
 
+        # 組合任務文字
+        task_display = f"{emoji} {time_range}｜{task_text}"
+        if category and category != "未分類":
+            task_display += f"｜{category}"
+
         rows.append({
             "type": "box",
             "layout": "horizontal",
@@ -83,7 +93,7 @@ def make_timetable_card(blocks, total_hours):
                 },
                 {
                     "type": "text",
-                    "text": f"{emoji} {time_range}｜{task_text}（{duration}）",
+                    "text": f"{task_display}（{duration}）",
                     "size": "sm",
                     "flex": 9,
                     "wrap": True,

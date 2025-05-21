@@ -201,14 +201,32 @@ def register_message_handlers(handler):
 
             schedule = get_today_schedule_for_user(user_id)
             
-            messages = [TextMessage(text=schedule["text_summary"])]
-            
-            if schedule["timetable_card"]:
-                messages.append(FlexMessage(
-                    alt_text="📅 今日排程",
-                    contents=FlexContainer.from_dict(schedule["timetable_card"])
-                ))
+            # 確保有排程內容
+            if not schedule["timetable_card"]:
+                reply = "😅 抱歉，目前無法生成排程，請稍後再試！"
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=[TextMessage(text=reply)]
+                        )
+                    )
+                return
 
+            # 發送說明文字和排程表格
+            messages = []
+            
+            # 添加說明文字
+            if schedule["text_summary"]:
+                messages.append(TextMessage(text=schedule["text_summary"]))
+            
+            # 添加排程表格
+            messages.append(FlexMessage(
+                alt_text="📅 今日排程",
+                contents=FlexContainer.from_dict(schedule["timetable_card"])
+            ))
+
+            # 發送訊息
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
                     ReplyMessageRequest(
