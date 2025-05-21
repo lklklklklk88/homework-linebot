@@ -17,12 +17,17 @@ def extract_schedule_blocks(text):
     
     if matches:
         for emoji, start, end, task, duration in matches:
+            # 檢查任務是否包含類別
+            task_parts = task.split('｜')
+            task_name = task_parts[0].strip()
+            category = task_parts[1].strip() if len(task_parts) > 1 else "未分類"
+            
             blocks.append({
                 'start': start,
                 'end': end,
-                'task': task,
+                'task': task_name,
                 'duration': f"{duration}分鐘",
-                'category': "未分類"  # 新格式中類別是可選的
+                'category': category
             })
         return blocks
     

@@ -29,6 +29,9 @@ def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
 [用輕鬆的語氣說明今天的排程重點，例如：
 "今天幫你排了 X 小時的任務，上午安排高專注內容，下午放鬆一點"]
 
+💡 溫馨提醒：
+任務完成後，記得到【完成作業】選單回報喔！
+
 📅 今日排程
 
 1. 🕘 09:00 ~ 12:30｜快點完成（210 分鐘）
@@ -40,9 +43,6 @@ def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
 7. 💻 15:30 ~ 16:30｜AI Agent｜寫程式
 
 ✅ 今日總時長：X 小時
-
-💡 溫馨提醒：
-任務完成後，記得到【完成作業】選單回報喔！
 
 以下是任務資料（供你安排時間順序使用）：
 """

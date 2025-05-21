@@ -566,7 +566,12 @@ def get_today_schedule_for_user(user_id):
     # 檢查是否包含時間表標記
     if "📅 今日排程" in raw_text:
         parts = raw_text.split("📅 今日排程")
-        explanation = parts[0].replace("📝 排程說明：", "").strip()
+        # 提取說明和溫馨提醒
+        explanation_parts = parts[0].split("💡 溫馨提醒：")
+        explanation = explanation_parts[0].replace("📝 排程說明：", "").strip()
+        if len(explanation_parts) > 1:
+            explanation += "\n\n💡 溫馨提醒：\n" + explanation_parts[1].strip()
+        
         schedule_text = parts[1].strip()
         
         # 提取總時數
@@ -581,7 +586,7 @@ def get_today_schedule_for_user(user_id):
         explanation_lines = []
         
         for line in lines:
-            if re.match(r'\d+\.\s*[^\n]+', line):
+            if re.match(r'\d+\.\s*[^\s]+', line):
                 schedule_lines.append(line)
             else:
                 explanation_lines.append(line)
