@@ -107,7 +107,7 @@ def register_postback_handlers(handler):
                         "spacing": "md",
                         "contents": [
                             {"type": "text", "text": "⏰ 請輸入預估完成時間", "weight": "bold", "size": "lg"},
-                            {"type": "text", "text": "請輸入數字（例如：1.5 小時）", "size": "sm", "color": "#888888"},
+                            {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
                             {
                                 "type": "button",
                                 "action": {
@@ -126,7 +126,7 @@ def register_postback_handlers(handler):
                         alt_text="請輸入預估完成時間",
                         contents=FlexContainer.from_dict(bubble)
                     ),
-                    TextMessage(text="請輸入預估完成時間（小時），例如：1.5")
+                    TextMessage(text="請輸入預估完成時間（小時），或從歷史記錄中選擇")
                 ]
 
                 with ApiClient(configuration) as api_client:
