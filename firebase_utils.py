@@ -110,14 +110,14 @@ def get_task_history(user_id):
     """
     ref = db.reference(f"users/{user_id}/task_history")
     history = ref.get() or {}
-    return history.get("names", []), history.get("types", [])
+    return history.get("names", []), history.get("types", []), history.get("times", [])
 
-def update_task_history(user_id, task_name, task_type):
+def update_task_history(user_id, task_name, task_type, estimated_time):
     """
     更新作業歷史記錄
     """
     ref = db.reference(f"users/{user_id}/task_history")
-    history = ref.get() or {"names": [], "types": []}
+    history = ref.get() or {"names": [], "types": [], "times": []}
     
     # 更新名稱歷史
     if task_name not in history["names"]:
@@ -130,6 +130,13 @@ def update_task_history(user_id, task_name, task_type):
         history["types"].append(task_type)
         if len(history["types"]) > 10:  # 保留最近10筆
             history["types"].pop(0)
+    
+    # 更新時間歷史
+    time_str = f"{estimated_time}小時"
+    if time_str not in history["times"]:
+        history["times"].append(time_str)
+        if len(history["times"]) > 10:  # 保留最近10筆
+            history["times"].pop(0)
     
     ref.set(history)
 

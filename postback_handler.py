@@ -73,7 +73,7 @@ def register_postback_handlers(handler):
                 try:
                     # 更新歷史記錄
                     print(f"更新歷史記錄：{temp_task}")  # 新增日誌
-                    update_task_history(user_id, temp_task["task"], temp_task["category"])
+                    update_task_history(user_id, temp_task["task"], temp_task["category"], temp_task["estimated_time"])
                     
                     # 新增作業
                     print("新增作業到資料庫")  # 新增日誌

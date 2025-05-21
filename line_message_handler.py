@@ -700,7 +700,7 @@ def handle_add_task_flow(event, user_id, text):
             set_user_state(user_id, "awaiting_task_type")
             
             # 第三步：選擇作業類型
-            _, type_history = get_task_history(user_id)
+            _, type_history, time_history = get_task_history(user_id)
             
             buttons = []
             for task_type in type_history[-3:]:  # 最多顯示3個
