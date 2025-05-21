@@ -4,18 +4,34 @@ import datetime
 def extract_schedule_blocks(text):
     """
     從 Gemini 回傳文字中擷取時間表內容
-    支援多種格式：
-    1. 09:30 - 10:30｜寫 C# 判斷式｜60分鐘｜類型：高專注
-    2. 09:30 - 10:30 寫 C# 判斷式（60分鐘）
-    3. 09:30 - 10:30 寫 C# 判斷式
+    支援格式：
+    1. 🕘 09:00 ~ 12:30｜快點完成（210 分鐘）
+    2. 🥪 12:30 ~ 13:00｜午餐（30 分鐘）
+    3. 📖 13:00 ~ 14:00｜作業系統｜閱讀
     """
     blocks = []
     
-    # 嘗試第一種格式（完整格式）
-    pattern1 = re.compile(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*｜(.+?)\s*｜(\d+)分鐘\s*｜類型：(.+)")
-    matches1 = pattern1.findall(text)
-    if matches1:
-        for start, end, task, duration, category in matches1:
+    # 匹配新格式
+    pattern = re.compile(r'\d+\.\s*([^\s]+)\s*(\d{1,2}:\d{2})\s*~\s*(\d{1,2}:\d{2})\s*｜(.+?)\s*（(\d+)分鐘）')
+    matches = pattern.findall(text)
+    
+    if matches:
+        for emoji, start, end, task, duration in matches:
+            blocks.append({
+                'start': start,
+                'end': end,
+                'task': task,
+                'duration': f"{duration}分鐘",
+                'category': "未分類"  # 新格式中類別是可選的
+            })
+        return blocks
+    
+    # 如果沒有匹配到新格式，嘗試舊格式
+    pattern_old = re.compile(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*｜(.+?)\s*｜(\d+)分鐘\s*｜類型：(.+)")
+    matches_old = pattern_old.findall(text)
+    
+    if matches_old:
+        for start, end, task, duration, category in matches_old:
             blocks.append({
                 'start': start,
                 'end': end,
@@ -25,51 +41,29 @@ def extract_schedule_blocks(text):
             })
         return blocks
     
-    # 嘗試第二種格式（帶括號的時長）
-    pattern2 = re.compile(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(.+?)\s*（(\d+)分鐘）")
-    matches2 = pattern2.findall(text)
-    if matches2:
-        for start, end, task, duration in matches2:
-            blocks.append({
-                'start': start,
-                'end': end,
-                'task': task,
-                'duration': f"{duration}分鐘",
-                'category': "未分類"
-            })
-        return blocks
-    
-    # 嘗試第三種格式（簡單格式）
-    pattern3 = re.compile(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*(.+)")
-    matches3 = pattern3.findall(text)
-    if matches3:
-        for start, end, task in matches3:
-            # 計算時長
-            start_time = datetime.datetime.strptime(start, "%H:%M")
-            end_time = datetime.datetime.strptime(end, "%H:%M")
-            duration_minutes = int((end_time - start_time).total_seconds() / 60)
-            
-            blocks.append({
-                'start': start,
-                'end': end,
-                'task': task.strip(),
-                'duration': f"{duration_minutes}分鐘",
-                'category': "未分類"
-            })
-        return blocks
-    
     return blocks
 
 def make_timetable_card(blocks, total_hours):
     """
-    製作時間表卡片，包含任務列表和操作按鈕
+    製作時間表卡片，使用簡潔的表格格式
     """
     rows = []
     for idx, block in enumerate(blocks, start=1):
-        time_range = f"{block['start']} - {block['end']}"
+        time_range = f"{block['start']} ~ {block['end']}"
         task_text = block['task']
         duration = block.get('duration', '')
         category = block.get('category', '')
+        
+        # 根據任務類型選擇表情符號
+        emoji = "🕘"  # 預設
+        if "休息" in task_text:
+            emoji = "🧠"
+        elif "午餐" in task_text:
+            emoji = "🥪"
+        elif "閱讀" in category:
+            emoji = "📖"
+        elif "寫程式" in category:
+            emoji = "💻"
 
         rows.append({
             "type": "box",
@@ -84,75 +78,17 @@ def make_timetable_card(blocks, total_hours):
                 },
                 {
                     "type": "text",
-                    "text": time_range,
+                    "text": f"{emoji} {time_range}｜{task_text}（{duration}）",
                     "size": "sm",
-                    "flex": 4,
-                    "color": "#1E88E5"
-                },
-                {
-                    "type": "text",
-                    "text": task_text,
-                    "size": "sm",
-                    "flex": 6,
+                    "flex": 9,
                     "wrap": True,
                     "color": "#111111"
-                },
-                {
-                    "type": "text",
-                    "text": f"{duration}｜{category}",
-                    "size": "sm",
-                    "flex": 4,
-                    "color": "#666666"
                 }
             ]
         })
 
-        # 添加操作按鈕
-        rows.append({
-            "type": "box",
-            "layout": "horizontal",
-            "contents": [
-                {
-                    "type": "button",
-                    "action": {
-                        "type": "postback",
-                        "label": "✅ 完成",
-                        "data": f"complete_task_{idx}"
-                    },
-                    "style": "primary",
-                    "color": "#4CAF50",
-                    "flex": 1
-                },
-                {
-                    "type": "button",
-                    "action": {
-                        "type": "postback",
-                        "label": "⏰ 延後",
-                        "data": f"delay_task_{idx}"
-                    },
-                    "style": "secondary",
-                    "flex": 1
-                },
-                {
-                    "type": "button",
-                    "action": {
-                        "type": "postback",
-                        "label": "🗑️ 刪除",
-                        "data": f"delete_task_{idx}"
-                    },
-                    "style": "secondary",
-                    "color": "#FF3B30",
-                    "flex": 1
-                }
-            ],
-            "spacing": "sm",
-            "margin": "sm"
-        })
-
-        rows.append({"type": "separator"})
-
     # 添加總時數資訊
-    total_hours_text = f"⏱️ 今日任務總長：{total_hours}小時"
+    total_hours_text = f"✅ 今日總時長：{total_hours} 小時"
     if total_hours > 7:
         total_hours_text += "\n⚠️ 今天安排較滿，建議保留喘息時間"
 
@@ -165,7 +101,7 @@ def make_timetable_card(blocks, total_hours):
             "contents": [
                 {
                     "type": "text",
-                    "text": "🕘 建議排程",
+                    "text": "📅 今日排程",
                     "weight": "bold",
                     "size": "md"
                 },

@@ -201,12 +201,19 @@ def register_message_handlers(handler):
 
             schedule = get_today_schedule_for_user(user_id)
             
-            # 直接回傳文字訊息
+            messages = [TextMessage(text=schedule["text_summary"])]
+            
+            if schedule["timetable_card"]:
+                messages.append(FlexMessage(
+                    alt_text="📅 今日排程",
+                    contents=FlexContainer.from_dict(schedule["timetable_card"])
+                ))
+
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[TextMessage(text=schedule["text_summary"])]
+                        messages=messages
                     )
                 )
             return
@@ -551,10 +558,47 @@ def get_today_schedule_for_user(user_id):
     prompt = generate_gemini_prompt(user_id, tasks, habits, today, available_hours)
     raw_text = call_gemini_schedule(prompt)
 
-    # 直接回傳 Gemini 的回應，不做額外處理
+    # 分離說明文字和時間表
+    explanation = ""
+    schedule_text = ""
+    total_hours = 0
+    
+    # 檢查是否包含時間表標記
+    if "📅 今日排程" in raw_text:
+        parts = raw_text.split("📅 今日排程")
+        explanation = parts[0].replace("📝 排程說明：", "").strip()
+        schedule_text = parts[1].strip()
+        
+        # 提取總時數
+        if "✅ 今日總時長：" in schedule_text:
+            total_parts = schedule_text.split("✅ 今日總時長：")
+            schedule_text = total_parts[0].strip()
+            total_hours = float(total_parts[1].split("小時")[0].strip())
+    else:
+        # 如果沒有找到時間表標記，嘗試直接解析
+        lines = raw_text.split('\n')
+        schedule_lines = []
+        explanation_lines = []
+        
+        for line in lines:
+            if re.match(r'\d+\.\s*[^\n]+', line):
+                schedule_lines.append(line)
+            else:
+                explanation_lines.append(line)
+        
+        explanation = '\n'.join(explanation_lines).strip()
+        schedule_text = '\n'.join(schedule_lines).strip()
+        
+        # 計算總時數
+        blocks = extract_schedule_blocks(schedule_text)
+        total_hours = sum(float(block['duration'].replace('分鐘', '')) / 60 for block in blocks)
+
+    blocks = extract_schedule_blocks(schedule_text)
+    schedule_card = make_timetable_card(blocks, total_hours) if blocks else None
+
     return {
-        "text_summary": raw_text,
-        "timetable_card": None  # 不再使用 Flex 卡片
+        "text_summary": explanation,
+        "timetable_card": schedule_card
     }
 
 def get_weekly_progress(user_id):
