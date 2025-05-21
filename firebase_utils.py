@@ -1,6 +1,7 @@
 import os, json, tempfile
 import firebase_admin
 from firebase_admin import credentials, db
+import datetime
 
 # Firebase 初始化
 cred_json = os.getenv("GOOGLE_CREDENTIALS")
@@ -46,3 +47,59 @@ def get_temp_task(user_id):
 
 def clear_temp_task(user_id):
     db.reference(f"users/{user_id}/temp_task").delete()
+
+def update_task_status(user_id, task_name, status):
+    """
+    更新任務狀態
+    """
+    try:
+        tasks = load_data(user_id)
+        for task in tasks:
+            if task["task"] == task_name:
+                task["done"] = (status == "completed")
+                save_data(tasks, user_id)
+                return True
+        return False
+    except Exception as e:
+        print(f"更新任務狀態時發生錯誤：{str(e)}")
+        return False
+
+def delete_task(user_id, task_name):
+    """
+    刪除任務
+    """
+    try:
+        tasks = load_data(user_id)
+        for i, task in enumerate(tasks):
+            if task["task"] == task_name:
+                del tasks[i]
+                save_data(tasks, user_id)
+                return True
+        return False
+    except Exception as e:
+        print(f"刪除任務時發生錯誤：{str(e)}")
+        return False
+
+def delay_task(user_id, task_name):
+    """
+    延後任務
+    """
+    try:
+        tasks = load_data(user_id)
+        for task in tasks:
+            if task["task"] == task_name:
+                # 將截止日期延後一天
+                if task.get("due") and task["due"] != "未設定":
+                    try:
+                        due_date = datetime.datetime.strptime(task["due"], "%Y-%m-%d")
+                        new_due = (due_date + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+                        task["due"] = new_due
+                        save_data(tasks, user_id)
+                        return True
+                    except:
+                        return False
+                return False
+        return False
+    except Exception as e:
+        print(f"延後任務時發生錯誤：{str(e)}")
+        return False
