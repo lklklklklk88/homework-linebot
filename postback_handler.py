@@ -98,7 +98,7 @@ def register_postback_handlers(handler):
                 set_temp_task(user_id, temp_task)
                 set_user_state(user_id, "awaiting_task_time")
                 
-                # 顯示時間選擇 UI
+                # 顯示時間輸入 UI
                 bubble = {
                     "type": "bubble",
                     "body": {
@@ -106,44 +106,8 @@ def register_postback_handlers(handler):
                         "layout": "vertical",
                         "spacing": "md",
                         "contents": [
-                            {"type": "text", "text": "⏰ 請選擇預估完成時間", "weight": "bold", "size": "lg"},
-                            {
-                                "type": "button",
-                                "action": {
-                                    "type": "postback",
-                                    "label": "30 分鐘",
-                                    "data": "select_time_30"
-                                },
-                                "style": "secondary"
-                            },
-                            {
-                                "type": "button",
-                                "action": {
-                                    "type": "postback",
-                                    "label": "60 分鐘",
-                                    "data": "select_time_60"
-                                },
-                                "style": "secondary"
-                            },
-                            {
-                                "type": "button",
-                                "action": {
-                                    "type": "postback",
-                                    "label": "90 分鐘",
-                                    "data": "select_time_90"
-                                },
-                                "style": "secondary"
-                            },
-                            {
-                                "type": "button",
-                                "action": {
-                                    "type": "datetimepicker",
-                                    "label": "⏰ 自訂時間",
-                                    "data": "select_time_custom",
-                                    "mode": "time"
-                                },
-                                "style": "primary"
-                            },
+                            {"type": "text", "text": "⏰ 請輸入預估完成時間", "weight": "bold", "size": "lg"},
+                            {"type": "text", "text": "請輸入數字（例如：1.5 小時）", "size": "sm", "color": "#888888"},
                             {
                                 "type": "button",
                                 "action": {
@@ -157,73 +121,12 @@ def register_postback_handlers(handler):
                     }
                 }
 
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[FlexMessage(
-                                alt_text="選擇預估時間",
-                                contents=FlexContainer.from_dict(bubble)
-                            )]
-                        )
-                    )
-                return
-
-            # 處理選擇時間
-            if data.startswith("select_time_"):
-                time_str = data.replace("select_time_", "")
-                hours = float(time_str) / 60  # 轉換為小時
-                temp_task = get_temp_task(user_id)
-                temp_task["estimated_time"] = hours
-                set_temp_task(user_id, temp_task)
-                set_user_state(user_id, "awaiting_task_type")
-                
-                # 顯示類型選擇 UI
-                _, type_history = get_task_history(user_id)
-                
-                buttons = []
-                for task_type in type_history[-3:]:  # 最多顯示3個
-                    buttons.append({
-                        "type": "button",
-                        "action": {
-                            "type": "postback",
-                            "label": task_type,
-                            "data": f"select_task_type_{task_type}"
-                        },
-                        "style": "secondary"
-                    })
-                
-                # 添加取消按鈕
-                buttons.append({
-                    "type": "button",
-                    "action": {
-                        "type": "postback",
-                        "label": "❌ 取消",
-                        "data": "cancel_add_task"
-                    },
-                    "style": "secondary"
-                })
-
-                bubble = {
-                    "type": "bubble",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "spacing": "md",
-                        "contents": [
-                            {"type": "text", "text": "📚 請選擇作業類型", "weight": "bold", "size": "lg"},
-                            {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
-                            *buttons
-                        ]
-                    }
-                }
-
                 messages = [
                     FlexMessage(
-                        alt_text="請選擇作業類型",
+                        alt_text="請輸入預估完成時間",
                         contents=FlexContainer.from_dict(bubble)
                     ),
-                    TextMessage(text="請輸入作業類型，或從歷史記錄中選擇")
+                    TextMessage(text="請輸入預估完成時間（小時），例如：1.5")
                 ]
 
                 with ApiClient(configuration) as api_client:
@@ -251,9 +154,9 @@ def register_postback_handlers(handler):
                         "spacing": "md",
                         "contents": [
                             {"type": "text", "text": "📝 確認新增作業", "weight": "bold", "size": "lg"},
-                            {"type": "text", "text": f"作業名稱：{temp_task['task']}", "size": "md"},
-                            {"type": "text", "text": f"預估時間：{temp_task['estimated_time']} 小時", "size": "md"},
-                            {"type": "text", "text": f"作業類型：{temp_task['category']}", "size": "md"}
+                            {"type": "text", "text": f"作業名稱：{temp_task.get('task', '未設定')}", "size": "md"},
+                            {"type": "text", "text": f"預估時間：{temp_task.get('estimated_time', 0)} 小時", "size": "md"},
+                            {"type": "text", "text": f"作業類型：{temp_task.get('category', '未設定')}", "size": "md"}
                         ]
                     },
                     "footer": {

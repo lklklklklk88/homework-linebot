@@ -760,12 +760,42 @@ def handle_add_task_flow(event, user_id, text):
                 )
             return True
         except:
-            reply = "⚠️ 請輸入有效的時間（例如：1.5）"
+            # 如果輸入的不是有效數字，顯示時間選擇卡片
+            bubble = {
+                "type": "bubble",
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "md",
+                    "contents": [
+                        {"type": "text", "text": "⏰ 請輸入預估完成時間", "weight": "bold", "size": "lg"},
+                        {"type": "text", "text": "請輸入數字（例如：1.5 小時）", "size": "sm", "color": "#888888"},
+                        {
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": "❌ 取消",
+                                "data": "cancel_add_task"
+                            },
+                            "style": "secondary"
+                        }
+                    ]
+                }
+            }
+
+            messages = [
+                FlexMessage(
+                    alt_text="請輸入預估完成時間",
+                    contents=FlexContainer.from_dict(bubble)
+                ),
+                TextMessage(text="請輸入預估完成時間（小時），例如：1.5")
+            ]
+
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[TextMessage(text=reply)]
+                        messages=messages
                     )
                 )
             return True
