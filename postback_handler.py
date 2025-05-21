@@ -302,6 +302,40 @@ def handle_postback(event):
         data = event.postback.data
         user_id = event.source.user_id
         
+        # 處理確認新增作業
+        if data == "confirm_add_task":
+            temp_task = get_temp_task(user_id)
+            if not temp_task:
+                reply = "⚠️ 發生錯誤，請重新開始新增作業流程"
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=[TextMessage(text=reply)]
+                        )
+                    )
+                return
+
+            # 更新歷史記錄
+            update_task_history(user_id, temp_task["task"], temp_task["category"])
+            
+            # 新增作業
+            add_task(user_id, temp_task)
+            
+            # 清除暫存資料
+            clear_temp_task(user_id)
+            set_user_state(user_id, None)
+            
+            reply = "✅ 作業已成功新增！"
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text=reply)]
+                    )
+                )
+            return
+
         # 處理取消操作
         if data == "cancel_add_task":
             clear_temp_task(user_id)
@@ -518,40 +552,6 @@ def handle_postback(event):
                             alt_text="確認新增作業",
                             contents=FlexContainer.from_dict(bubble)
                         )]
-                    )
-                )
-            return
-
-        # 處理確認新增作業
-        if data == "confirm_add_task":
-            temp_task = get_temp_task(user_id)
-            if not temp_task:
-                reply = "⚠️ 發生錯誤，請重新開始新增作業流程"
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[TextMessage(text=reply)]
-                        )
-                    )
-                return
-
-            # 更新歷史記錄
-            update_task_history(user_id, temp_task["task"], temp_task["category"])
-            
-            # 新增作業
-            add_task(user_id, temp_task)
-            
-            # 清除暫存資料
-            clear_temp_task(user_id)
-            set_user_state(user_id, None)
-            
-            reply = "✅ 作業已成功新增！"
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text=reply)]
                     )
                 )
             return
