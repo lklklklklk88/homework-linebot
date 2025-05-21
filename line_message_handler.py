@@ -617,6 +617,12 @@ def get_today_schedule_for_user(user_id):
         total_hours = sum(float(block['duration'].replace('分鐘', '')) / 60 for block in blocks)
 
     blocks = extract_schedule_blocks(schedule_text)
+    
+    # 調試訊息
+    print("原始回應：", raw_text)
+    print("排程文字：", schedule_text)
+    print("解析出的區塊：", blocks)
+    
     schedule_card = make_timetable_card(blocks, total_hours) if blocks else None
 
     return {

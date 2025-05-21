@@ -11,9 +11,14 @@ def extract_schedule_blocks(text):
     """
     blocks = []
     
-    # 匹配新格式
-    pattern = re.compile(r'\d+\.\s*([^\s]+)\s*(\d{1,2}:\d{2})\s*~\s*(\d{1,2}:\d{2})\s*｜(.+?)\s*（(\d+)分鐘）')
+    # 調試訊息
+    print("開始解析排程文字：", text)
+    
+    # 匹配新格式（更寬鬆的匹配）
+    pattern = re.compile(r'\d+\.\s*([^\s]+)?\s*(\d{1,2}:\d{2})\s*[~-]\s*(\d{1,2}:\d{2})\s*[｜|]\s*(.+?)(?:\s*[（(](\d+)分鐘[）)])?')
     matches = pattern.findall(text)
+    
+    print("匹配結果：", matches)
     
     if matches:
         for emoji, start, end, task, duration in matches:
@@ -22,29 +27,47 @@ def extract_schedule_blocks(text):
             task_name = task_parts[0].strip()
             category = task_parts[1].strip() if len(task_parts) > 1 else "未分類"
             
+            # 如果沒有找到時長，計算時長
+            if not duration:
+                try:
+                    start_time = datetime.datetime.strptime(start, "%H:%M")
+                    end_time = datetime.datetime.strptime(end, "%H:%M")
+                    duration_minutes = int((end_time - start_time).total_seconds() / 60)
+                    duration = str(duration_minutes)
+                except:
+                    duration = "0"
+            
             blocks.append({
                 'start': start,
                 'end': end,
                 'task': task_name,
                 'duration': f"{duration}分鐘",
                 'category': category,
-                'emoji': emoji
+                'emoji': emoji if emoji else "🕘"
             })
         return blocks
     
-    # 如果沒有匹配到新格式，嘗試舊格式
-    pattern_old = re.compile(r"(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*｜(.+?)\s*｜(\d+)分鐘\s*｜類型：(.+)")
-    matches_old = pattern_old.findall(text)
+    # 如果沒有匹配到新格式，嘗試更簡單的格式
+    pattern_simple = re.compile(r'\d+\.\s*(\d{1,2}:\d{2})\s*[~-]\s*(\d{1,2}:\d{2})\s*(.+)')
+    matches_simple = pattern_simple.findall(text)
     
-    if matches_old:
-        for start, end, task, duration, category in matches_old:
+    if matches_simple:
+        for start, end, task in matches_simple:
+            # 計算時長
+            try:
+                start_time = datetime.datetime.strptime(start, "%H:%M")
+                end_time = datetime.datetime.strptime(end, "%H:%M")
+                duration_minutes = int((end_time - start_time).total_seconds() / 60)
+            except:
+                duration_minutes = 0
+            
             blocks.append({
                 'start': start,
                 'end': end,
-                'task': task,
-                'duration': f"{duration}分鐘",
-                'category': category,
-                'emoji': "🕘"  # 預設表情符號
+                'task': task.strip(),
+                'duration': f"{duration_minutes}分鐘",
+                'category': "未分類",
+                'emoji': "🕘"
             })
         return blocks
     
