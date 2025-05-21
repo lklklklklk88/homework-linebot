@@ -3,7 +3,8 @@ import datetime
 from firebase_utils import (
     load_data, save_data, set_user_state, get_user_state,
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task,
-    update_task_status, delete_task, delay_task
+    update_task_status, delete_task, delay_task, get_task_history,
+    update_task_history, add_task
 )
 from firebase_admin import db
 
@@ -373,3 +374,250 @@ def handle_task_delay(user_id, task_name):
     except Exception as e:
         print(f"處理任務延後時發生錯誤：{str(e)}")
         return TextSendMessage(text="處理任務延後時發生錯誤，請稍後再試。")
+
+def handle_add_task_postback(event, data):
+    """
+    處理新增作業相關的 postback 事件
+    """
+    user_id = event.source.user_id
+    postback_data = event.postback.data
+
+    if postback_data.startswith("select_task_name_"):
+        # 處理選擇歷史作業名稱
+        task_name = postback_data.replace("select_task_name_", "")
+        temp_task = get_temp_task(user_id)
+        temp_task["task"] = task_name
+        set_temp_task(user_id, temp_task)
+        set_user_state(user_id, "awaiting_task_time")
+        
+        # 顯示時間選擇 UI
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {"type": "text", "text": "⏰ 請選擇預估完成時間", "weight": "bold", "size": "lg"},
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "30 分鐘",
+                            "data": "select_time_30"
+                        },
+                        "style": "secondary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "60 分鐘",
+                            "data": "select_time_60"
+                        },
+                        "style": "secondary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "90 分鐘",
+                            "data": "select_time_90"
+                        },
+                        "style": "secondary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "datetimepicker",
+                            "label": "⏰ 自訂時間",
+                            "data": "select_time_custom",
+                            "mode": "time"
+                        },
+                        "style": "primary"
+                    }
+                ]
+            }
+        }
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[FlexMessage(
+                        alt_text="選擇預估時間",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                )
+            )
+        return True
+
+    elif postback_data.startswith("select_time_"):
+        # 處理選擇預估時間
+        time_str = postback_data.replace("select_time_", "")
+        if time_str == "custom":
+            # 自訂時間會在 datetimepicker 事件中處理
+            return True
+        
+        hours = float(time_str) / 60  # 轉換為小時
+        temp_task = get_temp_task(user_id)
+        temp_task["estimated_time"] = hours
+        set_temp_task(user_id, temp_task)
+        set_user_state(user_id, "awaiting_task_type")
+        
+        # 顯示類型選擇 UI
+        _, type_history = get_task_history(user_id)
+        
+        buttons = []
+        for task_type in type_history[-4:]:  # 最多顯示4個
+            buttons.append({
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": task_type,
+                    "data": f"select_task_type_{task_type}"
+                },
+                "style": "secondary"
+            })
+
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {"type": "text", "text": "📚 請選擇作業類型", "weight": "bold", "size": "lg"},
+                    {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
+                    *buttons
+                ]
+            }
+        }
+
+        messages = [
+            FlexMessage(
+                alt_text="請選擇作業類型",
+                contents=FlexContainer.from_dict(bubble)
+            ),
+            TextMessage(text="請輸入作業類型，或從歷史記錄中選擇")
+        ]
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=messages
+                )
+            )
+        return True
+
+    elif postback_data.startswith("select_task_type_"):
+        # 處理選擇歷史作業類型
+        task_type = postback_data.replace("select_task_type_", "")
+        temp_task = get_temp_task(user_id)
+        temp_task["category"] = task_type
+        set_temp_task(user_id, temp_task)
+        
+        # 顯示確認訊息
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {"type": "text", "text": "📝 確認新增作業", "weight": "bold", "size": "lg"},
+                    {"type": "text", "text": f"作業名稱：{temp_task['task']}", "size": "md"},
+                    {"type": "text", "text": f"預估時間：{temp_task['estimated_time']} 小時", "size": "md"},
+                    {"type": "text", "text": f"作業類型：{temp_task['category']}", "size": "md"}
+                ]
+            },
+            "footer": {
+                "type": "box",
+                "layout": "horizontal",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "✅ 確認新增",
+                            "data": "confirm_add_task"
+                        },
+                        "style": "primary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "❌ 取消",
+                            "data": "cancel_add_task"
+                        },
+                        "style": "secondary"
+                    }
+                ]
+            }
+        }
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[FlexMessage(
+                        alt_text="確認新增作業",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                )
+            )
+        return True
+
+    elif postback_data == "confirm_add_task":
+        # 處理確認新增作業
+        temp_task = get_temp_task(user_id)
+        if not temp_task:
+            reply = "⚠️ 發生錯誤，請重新開始新增作業流程"
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text=reply)]
+                    )
+                )
+            return True
+
+        # 更新歷史記錄
+        update_task_history(user_id, temp_task["task"], temp_task["category"])
+        
+        # 新增作業
+        add_task(user_id, temp_task)
+        
+        # 清除暫存資料
+        clear_temp_task(user_id)
+        set_user_state(user_id, None)
+        
+        reply = "✅ 作業已成功新增！"
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=reply)]
+                )
+            )
+        return True
+
+    elif postback_data == "cancel_add_task":
+        # 處理取消新增作業
+        clear_temp_task(user_id)
+        set_user_state(user_id, None)
+        
+        reply = "❌ 已取消新增作業"
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=reply)]
+                )
+            )
+        return True
+
+    return False

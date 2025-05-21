@@ -103,3 +103,46 @@ def delay_task(user_id, task_name):
     except Exception as e:
         print(f"延後任務時發生錯誤：{str(e)}")
         return False
+
+def get_task_history(user_id):
+    """
+    獲取作業名稱歷史記錄
+    """
+    ref = db.reference(f"users/{user_id}/task_history")
+    history = ref.get() or {}
+    return history.get("names", []), history.get("types", [])
+
+def update_task_history(user_id, task_name, task_type):
+    """
+    更新作業歷史記錄
+    """
+    ref = db.reference(f"users/{user_id}/task_history")
+    history = ref.get() or {"names": [], "types": []}
+    
+    # 更新名稱歷史
+    if task_name not in history["names"]:
+        history["names"].append(task_name)
+        if len(history["names"]) > 10:  # 保留最近10筆
+            history["names"].pop(0)
+    
+    # 更新類型歷史
+    if task_type not in history["types"]:
+        history["types"].append(task_type)
+        if len(history["types"]) > 10:  # 保留最近10筆
+            history["types"].pop(0)
+    
+    ref.set(history)
+
+def add_task(user_id, task):
+    """
+    新增任務到用戶的任務列表中
+    """
+    try:
+        tasks = load_data(user_id)
+        task["done"] = False  # 確保新任務的狀態為未完成
+        tasks.append(task)
+        save_data(tasks, user_id)
+        return True
+    except Exception as e:
+        print(f"新增任務時發生錯誤：{str(e)}")
+        return False
