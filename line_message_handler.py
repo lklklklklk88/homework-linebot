@@ -562,7 +562,7 @@ def handle_add_task_flow(event, user_id, text):
         
         # 建立歷史記錄按鈕
         buttons = []
-        for name in name_history[-4:]:  # 最多顯示4個
+        for name in name_history[-3:]:  # 最多顯示3個
             buttons.append({
                 "type": "button",
                 "action": {
@@ -572,6 +572,17 @@ def handle_add_task_flow(event, user_id, text):
                 },
                 "style": "secondary"
             })
+        
+        # 添加取消按鈕
+        buttons.append({
+            "type": "button",
+            "action": {
+                "type": "postback",
+                "label": "❌ 取消",
+                "data": "cancel_add_task"
+            },
+            "style": "secondary"
+        })
 
         # 建立 Flex Message
         bubble = {
@@ -607,7 +618,7 @@ def handle_add_task_flow(event, user_id, text):
 
     elif state == "awaiting_task_name":
         # 處理手動輸入的作業名稱
-        temp_task["task"] = text
+        temp_task = {"task": text}  # 創建新的任務字典
         set_temp_task(user_id, temp_task)
         set_user_state(user_id, "awaiting_task_time")
         
@@ -656,6 +667,15 @@ def handle_add_task_flow(event, user_id, text):
                             "mode": "time"
                         },
                         "style": "primary"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "❌ 取消",
+                            "data": "cancel_add_task"
+                        },
+                        "style": "secondary"
                     }
                 ]
             }
@@ -685,7 +705,7 @@ def handle_add_task_flow(event, user_id, text):
             _, type_history = get_task_history(user_id)
             
             buttons = []
-            for task_type in type_history[-4:]:  # 最多顯示4個
+            for task_type in type_history[-3:]:  # 最多顯示3個
                 buttons.append({
                     "type": "button",
                     "action": {
@@ -695,6 +715,17 @@ def handle_add_task_flow(event, user_id, text):
                     },
                     "style": "secondary"
                 })
+            
+            # 添加取消按鈕
+            buttons.append({
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": "❌ 取消",
+                    "data": "cancel_add_task"
+                },
+                "style": "secondary"
+            })
 
             bubble = {
                 "type": "bubble",
