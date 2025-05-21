@@ -50,6 +50,22 @@ def register_postback_handlers(handler):
                         )
                     return
 
+                # 檢查必要欄位
+                required_fields = ["task", "estimated_time", "category"]
+                missing_fields = [field for field in required_fields if field not in temp_task or temp_task[field] is None]
+                
+                if missing_fields:
+                    print(f"缺少必要欄位：{missing_fields}")  # 新增日誌
+                    reply = f"⚠️ 缺少必要資訊：{', '.join(missing_fields)}，請重新開始新增作業流程"
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
+                        )
+                    return
+
                 try:
                     # 更新歷史記錄
                     print(f"更新歷史記錄：{temp_task}")  # 新增日誌
@@ -63,7 +79,7 @@ def register_postback_handlers(handler):
                     
                     # 清除暫存資料
                     clear_temp_task(user_id)
-                    set_user_state(user_id, None)
+                    clear_user_state(user_id)
                     
                     reply = "✅ 作業已成功新增！"
                     with ApiClient(configuration) as api_client:
