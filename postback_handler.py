@@ -168,13 +168,54 @@ def register_postback_handlers(handler):
 
             # 處理完成特定作業
             elif data.startswith("complete_task_"):
-                # 獲取任務索引
-                task_index = int(data.split("_")[-1])
-                
-                # 載入任務數據
-                tasks = load_data(user_id)
-                if not tasks:
-                    reply = "❌ 找不到任何作業"
+                try:
+                    # 獲取任務索引
+                    task_index = int(data.split("_")[-1])
+                    
+                    # 載入任務數據
+                    tasks = load_data(user_id)
+                    if not tasks:
+                        reply = "❌ 找不到任何作業"
+                        with ApiClient(configuration) as api_client:
+                            MessagingApi(api_client).reply_message(
+                                ReplyMessageRequest(
+                                    reply_token=event.reply_token,
+                                    messages=[TextMessage(text=reply)]
+                                )
+                            )
+                        return
+                    
+                    # 檢查索引是否有效
+                    if task_index < 0 or task_index >= len(tasks):
+                        reply = "❌ 無效的作業編號"
+                        with ApiClient(configuration) as api_client:
+                            MessagingApi(api_client).reply_message(
+                                ReplyMessageRequest(
+                                    reply_token=event.reply_token,
+                                    messages=[TextMessage(text=reply)]
+                                )
+                            )
+                        return
+                    
+                    # 檢查任務是否已經完成
+                    if tasks[task_index].get("done", False):
+                        reply = f"⚠️ 作業 {tasks[task_index]['task']} 已經完成了"
+                        with ApiClient(configuration) as api_client:
+                            MessagingApi(api_client).reply_message(
+                                ReplyMessageRequest(
+                                    reply_token=event.reply_token,
+                                    messages=[TextMessage(text=reply)]
+                                )
+                            )
+                        return
+                    
+                    # 更新任務狀態
+                    tasks[task_index]["done"] = True
+                    
+                    # 保存更新後的數據
+                    save_data(user_id, tasks)
+                    
+                    reply = f"✅ 已完成作業：{tasks[task_index]['task']}"
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(
                             ReplyMessageRequest(
@@ -183,10 +224,9 @@ def register_postback_handlers(handler):
                             )
                         )
                     return
-                
-                # 檢查索引是否有效
-                if task_index < 0 or task_index >= len(tasks):
-                    reply = "❌ 無效的作業編號"
+                except Exception as e:
+                    print(f"處理完成作業時發生錯誤：{str(e)}")
+                    reply = "❌ 發生錯誤，請稍後再試"
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(
                             ReplyMessageRequest(
@@ -195,34 +235,6 @@ def register_postback_handlers(handler):
                             )
                         )
                     return
-                
-                # 檢查任務是否已經完成
-                if tasks[task_index].get("done", False):
-                    reply = f"⚠️ 作業 {tasks[task_index]['task']} 已經完成了"
-                    with ApiClient(configuration) as api_client:
-                        MessagingApi(api_client).reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[TextMessage(text=reply)]
-                            )
-                        )
-                    return
-                
-                # 更新任務狀態
-                tasks[task_index]["done"] = True
-                
-                # 保存更新後的數據
-                save_data(user_id, tasks)
-                
-                reply = f"✅ 已完成作業：{tasks[task_index]['task']}"
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[TextMessage(text=reply)]
-                        )
-                    )
-                return
                 
             elif data == "set_remind_time":
                 # 直接顯示提醒時間設定選單
