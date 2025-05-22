@@ -196,7 +196,8 @@ def register_postback_handlers(handler):
                         "layout": "vertical",
                         "spacing": "md",
                         "contents": [
-                            {"type": "text", "text": "📝 請選擇作業類型", "weight": "bold", "size": "lg"}
+                            {"type": "text", "text": "📝 請選擇作業類型", "weight": "bold", "size": "lg"},
+                            {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"}
                         ]
                     }
                 }
@@ -232,7 +233,8 @@ def register_postback_handlers(handler):
                     FlexMessage(
                         alt_text="請選擇作業類型",
                         contents=FlexContainer.from_dict(bubble)
-                    )
+                    ),
+                    TextMessage(text="請輸入作業類型，或從歷史記錄中選擇")
                 ]
 
                 with ApiClient(configuration) as api_client:
