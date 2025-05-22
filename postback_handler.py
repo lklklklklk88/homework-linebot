@@ -298,14 +298,19 @@ def register_postback_handlers(handler):
                     }
                 }
 
+                messages = [
+                    FlexMessage(
+                        alt_text="請選擇截止日期",
+                        contents=FlexContainer.from_dict(bubble)
+                    ),
+                    TextMessage(text="請選擇截止日期，或選擇不設定截止日期")
+                ]
+
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(
                         ReplyMessageRequest(
                             reply_token=event.reply_token,
-                            messages=[FlexMessage(
-                                alt_text="請選擇截止日期",
-                                contents=FlexContainer.from_dict(bubble)
-                            )]
+                            messages=messages
                         )
                     )
                 return True
