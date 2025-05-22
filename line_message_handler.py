@@ -571,7 +571,7 @@ def handle_add_task_flow(event, user_id, text):
         clear_temp_task(user_id)  # 清除之前的暫存資料
         
         # 獲取歷史記錄
-        name_history, _, _ = get_task_history(user_id)
+        name_history, _, _ = get_task_history(user_id)  # 修正這裡，接收三個返回值
         
         # 建立歷史記錄按鈕
         buttons = []
@@ -637,17 +637,17 @@ def handle_add_task_flow(event, user_id, text):
         
         # 第二步：選擇預估時間
         # 獲取歷史記錄
-        name_history, _ = get_task_history(user_id)
+        _, _, time_history = get_task_history(user_id)  # 修正這裡，接收三個返回值
         
         # 建立歷史記錄按鈕
         buttons = []
-        for name in name_history[-3:]:  # 最多顯示3個
+        for time in time_history[-3:]:  # 最多顯示3個
             buttons.append({
                 "type": "button",
                 "action": {
                     "type": "postback",
-                    "label": name,
-                    "data": f"select_task_name_{name}"
+                    "label": f"{time}小時",
+                    "data": f"select_time_{time}"
                 },
                 "style": "secondary"
             })
@@ -706,7 +706,7 @@ def handle_add_task_flow(event, user_id, text):
             set_user_state(user_id, "awaiting_task_type")
             
             # 第三步：選擇作業類型
-            _, type_history, _ = get_task_history(user_id)
+            _, type_history, _ = get_task_history(user_id)  # 修正這裡，接收三個返回值
             
             buttons = []
             for task_type in type_history[-3:]:  # 最多顯示3個
@@ -715,7 +715,7 @@ def handle_add_task_flow(event, user_id, text):
                     "action": {
                         "type": "postback",
                         "label": task_type,
-                        "data": f"select_task_type_{task_type}"
+                        "data": f"select_type_{task_type}"
                     },
                     "style": "secondary"
                 })
