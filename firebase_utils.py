@@ -25,7 +25,7 @@ def load_data(user_id):
     data = ref.get()
     return data if data else []
 
-def save_data(data, user_id):
+def save_data(user_id, data):
     ref = db.reference(f"users/{user_id}/tasks")
     ref.set(data)
 
@@ -57,7 +57,7 @@ def update_task_status(user_id, task_name, status):
         for task in tasks:
             if task["task"] == task_name:
                 task["done"] = (status == "completed")
-                save_data(tasks, user_id)
+                save_data(user_id, tasks)
                 return True
         return False
     except Exception as e:
@@ -73,7 +73,7 @@ def delete_task(user_id, task_name):
         for i, task in enumerate(tasks):
             if task["task"] == task_name:
                 del tasks[i]
-                save_data(tasks, user_id)
+                save_data(user_id, tasks)
                 return True
         return False
     except Exception as e:
@@ -94,7 +94,7 @@ def delay_task(user_id, task_name):
                         due_date = datetime.datetime.strptime(task["due"], "%Y-%m-%d")
                         new_due = (due_date + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
                         task["due"] = new_due
-                        save_data(tasks, user_id)
+                        save_data(user_id, tasks)
                         return True
                     except:
                         return False
@@ -156,7 +156,7 @@ def add_task(user_id, task):
         tasks = load_data(user_id)
         task["done"] = False  # 確保新任務的狀態為未完成
         tasks.append(task)
-        save_data(tasks, user_id)
+        save_data(user_id, tasks)
         return True
     except Exception as e:
         print(f"新增任務時發生錯誤：{str(e)}")

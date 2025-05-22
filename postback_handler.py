@@ -213,9 +213,13 @@ def register_postback_handlers(handler):
                     tasks[task_index]["done"] = True
                     
                     # 保存更新後的數據
-                    save_data(user_id, tasks)
+                    try:
+                        save_data(user_id, tasks)
+                        reply = f"✅ 已完成作業：{tasks[task_index]['task']}"
+                    except Exception as e:
+                        print(f"保存數據時發生錯誤：{str(e)}")
+                        reply = "❌ 保存數據時發生錯誤，請稍後再試"
                     
-                    reply = f"✅ 已完成作業：{tasks[task_index]['task']}"
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(
                             ReplyMessageRequest(
@@ -970,10 +974,47 @@ def register_postback_handlers(handler):
 
             # 處理一鍵清除已截止作業
             elif data == "clear_expired_all":
-                # 載入任務數據
-                tasks = load_data(user_id)
-                if not tasks:
-                    reply = "✅ 目前沒有任何作業"
+                try:
+                    # 載入任務數據
+                    tasks = load_data(user_id)
+                    if not tasks:
+                        reply = "✅ 目前沒有任何作業"
+                        with ApiClient(configuration) as api_client:
+                            MessagingApi(api_client).reply_message(
+                                ReplyMessageRequest(
+                                    reply_token=event.reply_token,
+                                    messages=[TextMessage(text=reply)]
+                                )
+                            )
+                        return
+
+                    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
+                    expired_count = 0
+                    filtered_tasks = []
+
+                    for task in tasks:
+                        due = task.get("due", "未設定")
+                        done = task.get("done", False)
+                        if done or due == "未設定":
+                            filtered_tasks.append(task)
+                            continue
+
+                        try:
+                            due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
+                            if due_date >= now:
+                                filtered_tasks.append(task)
+                            else:
+                                expired_count += 1
+                        except:
+                            filtered_tasks.append(task)
+
+                    if expired_count == 0:
+                        reply = "✅ 沒有已截止的作業需要清除"
+                    else:
+                        # 保存更新後的數據
+                        save_data(user_id, filtered_tasks)
+                        reply = f"✅ 已清除 {expired_count} 個已截止的作業"
+                    
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(
                             ReplyMessageRequest(
@@ -982,42 +1023,17 @@ def register_postback_handlers(handler):
                             )
                         )
                     return
-
-                now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
-                expired_count = 0
-                filtered_tasks = []
-
-                for task in tasks:
-                    due = task.get("due", "未設定")
-                    done = task.get("done", False)
-                    if done or due == "未設定":
-                        filtered_tasks.append(task)
-                        continue
-
-                    try:
-                        due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
-                        if due_date >= now:
-                            filtered_tasks.append(task)
-                        else:
-                            expired_count += 1
-                    except:
-                        filtered_tasks.append(task)
-
-                if expired_count == 0:
-                    reply = "✅ 沒有已截止的作業需要清除"
-                else:
-                    # 保存更新後的數據
-                    save_data(user_id, filtered_tasks)
-                    reply = f"✅ 已清除 {expired_count} 個已截止的作業"
-
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[TextMessage(text=reply)]
+                except Exception as e:
+                    print(f"處理一鍵清除已截止作業時發生錯誤：{str(e)}")
+                    reply = "❌ 發生錯誤，請稍後再試"
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
                         )
-                    )
-                return
+                    return
 
             # 處理手動選擇清除已截止作業
             if data == "clear_expired_select":
@@ -1132,23 +1148,61 @@ def register_postback_handlers(handler):
 
             # 處理刪除已截止作業
             if data.startswith("delete_expired_"):
-                task_index = int(data.replace("delete_expired_", ""))
-                data = load_data(user_id)
-                if 0 <= task_index < len(data):
-                    data.pop(task_index)
-                    save_data(user_id, data)  # 修正參數順序
-                    reply = "✅ 已清除指定的已截止作業"
-                else:
-                    reply = "❌ 找不到指定的作業"
-                
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[TextMessage(text=reply)]
+                try:
+                    # 獲取任務索引
+                    task_index = int(data.replace("delete_expired_", ""))
+                    
+                    # 載入任務數據
+                    tasks = load_data(user_id)
+                    if not tasks:
+                        reply = "❌ 找不到任何作業"
+                        with ApiClient(configuration) as api_client:
+                            MessagingApi(api_client).reply_message(
+                                ReplyMessageRequest(
+                                    reply_token=event.reply_token,
+                                    messages=[TextMessage(text=reply)]
+                                )
+                            )
+                        return
+                    
+                    # 檢查索引是否有效
+                    if task_index < 0 or task_index >= len(tasks):
+                        reply = "❌ 無效的作業編號"
+                        with ApiClient(configuration) as api_client:
+                            MessagingApi(api_client).reply_message(
+                                ReplyMessageRequest(
+                                    reply_token=event.reply_token,
+                                    messages=[TextMessage(text=reply)]
+                                )
+                            )
+                        return
+                    
+                    # 刪除指定的作業
+                    deleted_task = tasks.pop(task_index)
+                    
+                    # 保存更新後的數據
+                    save_data(user_id, tasks)
+                    
+                    reply = f"✅ 已清除作業：{deleted_task['task']}"
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
                         )
-                    )
-                return
+                    return
+                except Exception as e:
+                    print(f"處理刪除已截止作業時發生錯誤：{str(e)}")
+                    reply = "❌ 發生錯誤，請稍後再試"
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
+                        )
+                    return
 
         except Exception as e:
             print(f"處理 postback 事件時發生錯誤：{str(e)}")
