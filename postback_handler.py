@@ -178,12 +178,7 @@ def register_postback_handlers(handler):
                         "layout": "vertical",
                         "spacing": "md",
                         "contents": [
-                            {"type": "text", "text": "📝 作業資訊", "weight": "bold", "size": "lg"},
-                            {"type": "text", "text": f"作業名稱：{temp_task.get('task', '未設定')}", "size": "md"},
-                            {"type": "text", "text": f"預估時間：{temp_task.get('estimated_time', 0)} 小時", "size": "md"},
-                            {"type": "text", "text": f"作業類型：{temp_task.get('category', '未設定')}", "size": "md"},
-                            {"type": "separator"},
-                            {"type": "text", "text": "📅 請選擇截止日期", "weight": "bold", "size": "md"},
+                            {"type": "text", "text": "📅 請選擇截止日期", "weight": "bold", "size": "lg"},
                             {
                                 "type": "button",
                                 "action": {
@@ -237,6 +232,12 @@ def register_postback_handlers(handler):
                 if not temp_task:
                     messages = [TextMessage(text="❌ 發生錯誤，請重新開始新增作業流程")]
                 else:
+                    # 從 postback 事件中獲取日期值
+                    date_str = event.postback.params.get('date')
+                    if date_str:
+                        temp_task["due"] = date_str
+                        set_temp_task(user_id, temp_task)
+                    
                     # 顯示確認訊息
                     bubble = {
                         "type": "bubble",
