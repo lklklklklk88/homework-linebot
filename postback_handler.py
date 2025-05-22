@@ -168,8 +168,9 @@ def register_postback_handlers(handler):
                 temp_task = get_temp_task(user_id)
                 temp_task["category"] = task_type
                 set_temp_task(user_id, temp_task)
+                set_user_state(user_id, "awaiting_task_due")
                 
-                # 顯示確認訊息
+                # 顯示截止日期選擇 UI
                 bubble = {
                     "type": "bubble",
                     "body": {
@@ -177,25 +178,33 @@ def register_postback_handlers(handler):
                         "layout": "vertical",
                         "spacing": "md",
                         "contents": [
-                            {"type": "text", "text": "📝 確認新增作業", "weight": "bold", "size": "lg"},
+                            {"type": "text", "text": "📝 作業資訊", "weight": "bold", "size": "lg"},
                             {"type": "text", "text": f"作業名稱：{temp_task.get('task', '未設定')}", "size": "md"},
                             {"type": "text", "text": f"預估時間：{temp_task.get('estimated_time', 0)} 小時", "size": "md"},
-                            {"type": "text", "text": f"作業類型：{temp_task.get('category', '未設定')}", "size": "md"}
-                        ]
-                    },
-                    "footer": {
-                        "type": "box",
-                        "layout": "horizontal",
-                        "spacing": "sm",
-                        "contents": [
+                            {"type": "text", "text": f"作業類型：{temp_task.get('category', '未設定')}", "size": "md"},
+                            {"type": "separator"},
+                            {"type": "text", "text": "📅 請選擇截止日期", "weight": "bold", "size": "md"},
+                            {
+                                "type": "button",
+                                "action": {
+                                    "type": "datetimepicker",
+                                    "label": "📅 選擇日期",
+                                    "data": "select_task_due",
+                                    "mode": "date",
+                                    "initial": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d"),
+                                    "max": "2099-12-31",
+                                    "min": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+                                },
+                                "style": "primary"
+                            },
                             {
                                 "type": "button",
                                 "action": {
                                     "type": "postback",
-                                    "label": "✅ 確認新增",
-                                    "data": "confirm_add_task"
+                                    "label": "❌ 不設定截止日期",
+                                    "data": "no_due_date"
                                 },
-                                "style": "primary"
+                                "style": "secondary"
                             },
                             {
                                 "type": "button",
@@ -215,12 +224,12 @@ def register_postback_handlers(handler):
                         ReplyMessageRequest(
                             reply_token=event.reply_token,
                             messages=[FlexMessage(
-                                alt_text="確認新增作業",
+                                alt_text="請選擇截止日期",
                                 contents=FlexContainer.from_dict(bubble)
                             )]
                         )
                     )
-                return
+                return True
 
             # 處理選擇截止日期
             if data == "select_task_due":

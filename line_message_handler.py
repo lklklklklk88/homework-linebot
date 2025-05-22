@@ -696,7 +696,7 @@ def handle_add_task_flow(event, user_id, text):
             temp_task = get_temp_task(user_id)  # 重新獲取臨時任務
             if not temp_task:
                 temp_task = {}
-            temp_task["estimated_time"] = hours
+            temp_task["estimated_time"] = float(hours)  # 確保是浮點數
             set_temp_task(user_id, temp_task)
             set_user_state(user_id, "awaiting_task_type")
             
