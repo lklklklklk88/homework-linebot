@@ -122,6 +122,9 @@ def register_postback_handlers(handler):
                 set_temp_task(user_id, temp_task)
                 set_user_state(user_id, "awaiting_task_time")
                 
+                # 獲取歷史時間記錄
+                _, _, time_history = get_task_history(user_id)
+                
                 # 顯示時間輸入 UI
                 bubble = {
                     "type": "bubble",
@@ -131,19 +134,34 @@ def register_postback_handlers(handler):
                         "spacing": "md",
                         "contents": [
                             {"type": "text", "text": "⏰ 請輸入預估完成時間", "weight": "bold", "size": "lg"},
-                            {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
-                            {
-                                "type": "button",
-                                "action": {
-                                    "type": "postback",
-                                    "label": "❌ 取消",
-                                    "data": "cancel_add_task"
-                                },
-                                "style": "secondary"
-                            }
+                            {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"}
                         ]
                     }
                 }
+                
+                # 添加歷史時間按鈕
+                if time_history:
+                    for time in time_history:
+                        bubble["body"]["contents"].append({
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": time,
+                                "data": f"select_time_{time.replace('小時', '')}"
+                            },
+                            "style": "secondary"
+                        })
+                
+                # 添加取消按鈕
+                bubble["body"]["contents"].append({
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "❌ 取消",
+                        "data": "cancel_add_task"
+                    },
+                    "style": "secondary"
+                })
 
                 messages = [
                     FlexMessage(
@@ -151,6 +169,70 @@ def register_postback_handlers(handler):
                         contents=FlexContainer.from_dict(bubble)
                     ),
                     TextMessage(text="請輸入預估完成時間（小時），或從歷史記錄中選擇")
+                ]
+
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=messages
+                        )
+                    )
+                return
+
+            # 處理選擇歷史時間
+            if data.startswith("select_time_"):
+                time_value = data.replace("select_time_", "")
+                temp_task = get_temp_task(user_id)
+                temp_task["estimated_time"] = float(time_value)
+                set_temp_task(user_id, temp_task)
+                set_user_state(user_id, "awaiting_task_type")
+                
+                # 顯示作業類型選擇 UI
+                bubble = {
+                    "type": "bubble",
+                    "body": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "spacing": "md",
+                        "contents": [
+                            {"type": "text", "text": "📝 請選擇作業類型", "weight": "bold", "size": "lg"}
+                        ]
+                    }
+                }
+                
+                # 獲取歷史類型記錄
+                _, type_history, _ = get_task_history(user_id)
+                
+                # 添加歷史類型按鈕
+                if type_history:
+                    for task_type in type_history:
+                        bubble["body"]["contents"].append({
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": task_type,
+                                "data": f"select_task_type_{task_type}"
+                            },
+                            "style": "secondary"
+                        })
+                
+                # 添加取消按鈕
+                bubble["body"]["contents"].append({
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "❌ 取消",
+                        "data": "cancel_add_task"
+                    },
+                    "style": "secondary"
+                })
+
+                messages = [
+                    FlexMessage(
+                        alt_text="請選擇作業類型",
+                        contents=FlexContainer.from_dict(bubble)
+                    )
                 ]
 
                 with ApiClient(configuration) as api_client:
