@@ -1035,122 +1035,105 @@ def register_postback_handlers(handler):
                         )
                     return
 
-            # 處理手動選擇清除已截止作業
-            if data == "clear_expired_select":
-                # 載入任務數據
-                tasks = load_data(user_id)
-                if not tasks:
-                    reply = "✅ 目前沒有任何作業"
-                    with ApiClient(configuration) as api_client:
-                        MessagingApi(api_client).reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[TextMessage(text=reply)]
+            # 處理手動選擇清除已完成作業
+            elif data == "clear_completed_select":
+                try:
+                    # 載入任務數據
+                    tasks = load_data(user_id)
+                    if not tasks:
+                        reply = "✅ 目前沒有任何作業"
+                        with ApiClient(configuration) as api_client:
+                            MessagingApi(api_client).reply_message(
+                                ReplyMessageRequest(
+                                    reply_token=event.reply_token,
+                                    messages=[TextMessage(text=reply)]
+                                )
                             )
-                        )
-                    return
+                        return
 
-                # 找出已截止的作業
-                now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
-                expired_tasks = []
-                
-                for i, task in enumerate(tasks):
-                    due = task.get("due", "未設定")
-                    done = task.get("done", False)
-                    if not done and due != "未設定":
-                        try:
-                            due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
-                            if due_date < now:
-                                expired_tasks.append((i, task))
-                        except:
-                            pass
-
-                if not expired_tasks:
-                    reply = "✅ 沒有已截止的作業需要清除"
-                    with ApiClient(configuration) as api_client:
-                        MessagingApi(api_client).reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[TextMessage(text=reply)]
+                    # 找出已完成的作業
+                    completed_tasks = []
+                    for i, task in enumerate(tasks):
+                        if task.get("done", False):
+                            completed_tasks.append((i, task))
+                    
+                    if not completed_tasks:
+                        reply = "✅ 沒有已完成的作業需要清除"
+                        with ApiClient(configuration) as api_client:
+                            MessagingApi(api_client).reply_message(
+                                ReplyMessageRequest(
+                                    reply_token=event.reply_token,
+                                    messages=[TextMessage(text=reply)]
+                                )
                             )
-                        )
-                    return
+                        return
 
-                # 建立清除按鈕
-                buttons = []
-                for i, task in expired_tasks:
+                    # 建立清除按鈕
+                    buttons = []
+                    for i, task in completed_tasks:
+                        buttons.append({
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": f"🗑️ {task['task']}",
+                                "data": f"delete_completed_{i}"
+                            },
+                            "style": "secondary"
+                        })
+
+                    # 添加取消按鈕
                     buttons.append({
                         "type": "button",
                         "action": {
                             "type": "postback",
-                            "label": f"🗑️ {task['task']} ({task['due']})",
-                            "data": f"delete_expired_{i}"
+                            "label": "❌ 取消",
+                            "data": "cancel_clear_completed"
                         },
                         "style": "secondary"
                     })
-
-                # 添加取消按鈕
-                buttons.append({
-                    "type": "button",
-                    "action": {
-                        "type": "postback",
-                        "label": "❌ 取消",
-                        "data": "cancel_clear_expired"
-                    },
-                    "style": "secondary"
-                })
-
-                bubble = {
-                    "type": "bubble",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "spacing": "md",
-                        "contents": [
-                            {"type": "text", "text": "選擇要清除的已截止作業：", "weight": "bold", "size": "lg"},
-                            {"type": "text", "text": f"共有 {len(expired_tasks)} 個已截止作業", "size": "sm", "color": "#888888"},
-                            *buttons
-                        ]
+                    
+                    bubble = {
+                        "type": "bubble",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "spacing": "md",
+                            "contents": [
+                                {"type": "text", "text": "選擇要清除的已完成作業：", "weight": "bold", "size": "lg"},
+                                {"type": "text", "text": f"共有 {len(completed_tasks)} 個已完成作業", "size": "sm", "color": "#888888"},
+                                *buttons
+                            ]
+                        }
                     }
-                }
-
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[FlexMessage(
-                                alt_text="選擇要清除的已截止作業",
-                                contents=FlexContainer.from_dict(bubble)
-                            )]
+                
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[FlexMessage(
+                                    alt_text="選擇要清除的已完成作業",
+                                    contents=FlexContainer.from_dict(bubble)
+                                )]
+                            )
                         )
-                    )
-                return
+                    return
+                except Exception as e:
+                    print(f"處理手動選擇清除已完成作業時發生錯誤：{str(e)}")
+                    reply = "❌ 發生錯誤，請稍後再試"
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
+                        )
+                    return
 
             # 處理刪除已完成作業
-            if data.startswith("delete_completed_"):
-                task_index = int(data.replace("delete_completed_", ""))
-                data = load_data(user_id)
-                if 0 <= task_index < len(data):
-                    data.pop(task_index)
-                    save_data(user_id, data)  # 修正參數順序
-                    reply = "✅ 已清除指定的已完成作業"
-                else:
-                    reply = "❌ 找不到指定的作業"
-                
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[TextMessage(text=reply)]
-                        )
-                    )
-                return
-
-            # 處理刪除已截止作業
-            if data.startswith("delete_expired_"):
+            elif data.startswith("delete_completed_"):
                 try:
                     # 獲取任務索引
-                    task_index = int(data.replace("delete_expired_", ""))
+                    task_index = int(data.replace("delete_completed_", ""))
                     
                     # 載入任務數據
                     tasks = load_data(user_id)
@@ -1193,7 +1176,7 @@ def register_postback_handlers(handler):
                         )
                     return
                 except Exception as e:
-                    print(f"處理刪除已截止作業時發生錯誤：{str(e)}")
+                    print(f"處理刪除已完成作業時發生錯誤：{str(e)}")
                     reply = "❌ 發生錯誤，請稍後再試"
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(
