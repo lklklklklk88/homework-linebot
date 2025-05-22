@@ -452,37 +452,36 @@ def register_message_handlers(handler):
                         {"type": "text", "text": "請選擇操作", "weight": "bold", "size": "lg"},
                         {
                             "type": "button",
-                            "action": {"type": "message", "label": "➕ 新增作業", "text": "新增作業"},
+                            "action": {"type": "postback", "label": "➕ 新增作業", "data": "add_task"},
                             "style": "primary"
                         },
                         {
                             "type": "button",
-                            "action": {"type": "message", "label": "✅ 完成作業", "text": "完成作業"},
+                            "action": {"type": "postback", "label": "✅ 完成作業", "data": "complete_task"},
                             "style": "secondary"
                         },
                         {
                             "type": "button",
-                            "action": {"type": "message", "label": "⏰ 提醒時間", "text": "提醒時間"},
+                            "action": {"type": "postback", "label": "⏰ 提醒時間", "data": "set_remind_time"},
                             "style": "secondary"
                         },
                         {
                             "type": "button",
-                            "action": {"type": "message", "label": "📋 查看作業", "text": "查看作業"},
+                            "action": {"type": "postback", "label": "📋 查看作業", "data": "view_tasks"},
                             "style": "secondary"
                         },
                         {
                             "type": "button",
-                            "action": {"type": "message", "label": "🧹 清除已完成作業", "text": "清除已完成作業"},
+                            "action": {"type": "postback", "label": "🧹 清除已完成作業", "data": "clear_completed"},
                             "style": "primary",
                             "color": "#FF3B30"  # ← 紅色
                         },
                         {
                             "type": "button",
-                            "action": {"type": "message", "label": "🗑️ 清除已截止作業", "text": "清除已截止作業"},
+                            "action": {"type": "postback", "label": "🗑️ 清除已截止作業", "data": "clear_expired"},
                             "style": "primary",
                             "color": "#FF3B30"
                         }
-
                     ]
                 }
             }
