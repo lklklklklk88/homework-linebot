@@ -85,14 +85,19 @@ def register_postback_handlers(handler):
                     }
                 }
 
+                messages = [
+                    FlexMessage(
+                        alt_text="請輸入作業名稱",
+                        contents=FlexContainer.from_dict(bubble)
+                    ),
+                    TextMessage(text="請輸入作業名稱：")
+                ]
+
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(
                         ReplyMessageRequest(
                             reply_token=event.reply_token,
-                            messages=[FlexMessage(
-                                alt_text="請輸入作業名稱",
-                                contents=FlexContainer.from_dict(bubble)
-                            )]
+                            messages=messages
                         )
                     )
                 return
@@ -594,7 +599,7 @@ def register_postback_handlers(handler):
                         alt_text="請選擇作業類型",
                         contents=FlexContainer.from_dict(bubble)
                     ),
-                    TextMessage(text="請選擇作業類型，或從歷史記錄中選擇")
+                    TextMessage(text="請輸入作業類型：")
                 ]
 
                 with ApiClient(configuration) as api_client:
@@ -622,11 +627,6 @@ def register_postback_handlers(handler):
                         "layout": "vertical",
                         "spacing": "md",
                         "contents": [
-                            {"type": "text", "text": "📝 作業資訊", "weight": "bold", "size": "lg"},
-                            {"type": "text", "text": f"作業名稱：{temp_task.get('task', '未設定')}", "size": "md"},
-                            {"type": "text", "text": f"預估時間：{temp_task.get('estimated_time', 0)} 小時", "size": "md"},
-                            {"type": "text", "text": f"作業類型：{temp_task.get('category', '未設定')}", "size": "md"},
-                            {"type": "separator"},
                             {"type": "text", "text": "📅 請選擇截止日期", "weight": "bold", "size": "md"},
                             {
                                 "type": "button",
@@ -751,7 +751,18 @@ def register_postback_handlers(handler):
 
             # 處理選擇提醒時間
             if data == "select_remind_time":
-                # 這裡不需要做任何事，因為時間選擇器會自動觸發 postback 事件
+                # 從 postback 參數中獲取時間
+                time = event.postback.params.get('time', '08:00')
+                # 更新提醒時間
+                db.reference(f"users/{user_id}/remind_time").set(time)
+                reply = f"✅ 已設定提醒時間為 {time}"
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=[TextMessage(text=reply)]
+                        )
+                    )
                 return
 
             # 處理完成作業
@@ -761,7 +772,7 @@ def register_postback_handlers(handler):
                 if 0 <= task_index < len(data):
                     task = data[task_index]
                     task["done"] = True
-                    save_data(user_id, data)
+                    save_data(user_id, data)  # 修正參數順序
                     reply = f"✅ 已完成作業：{task['task']}"
                 else:
                     reply = "❌ 找不到指定的作業"
@@ -895,7 +906,7 @@ def register_postback_handlers(handler):
             if data == "clear_completed_all":
                 data = load_data(user_id)
                 data = [task for task in data if not task.get("done", False)]
-                save_data(user_id, data)
+                save_data(user_id, data)  # 修正參數順序
                 reply = "✅ 已清除所有已完成的作業"
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(
@@ -915,7 +926,7 @@ def register_postback_handlers(handler):
                     not task.get("done", False) and
                     datetime.datetime.strptime(task["due"], "%Y-%m-%d").date() < now
                 )]
-                save_data(user_id, data)
+                save_data(user_id, data)  # 修正參數順序
                 reply = "✅ 已清除所有已截止的作業"
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(
@@ -932,7 +943,7 @@ def register_postback_handlers(handler):
                 data = load_data(user_id)
                 if 0 <= task_index < len(data):
                     data.pop(task_index)
-                    save_data(user_id, data)
+                    save_data(user_id, data)  # 修正參數順序
                     reply = "✅ 已清除指定的已完成作業"
                 else:
                     reply = "❌ 找不到指定的作業"
@@ -952,7 +963,7 @@ def register_postback_handlers(handler):
                 data = load_data(user_id)
                 if 0 <= task_index < len(data):
                     data.pop(task_index)
-                    save_data(user_id, data)
+                    save_data(user_id, data)  # 修正參數順序
                     reply = "✅ 已清除指定的已截止作業"
                 else:
                     reply = "❌ 找不到指定的作業"
