@@ -11,6 +11,7 @@ from flex_utils import make_schedule_carousel, extract_schedule_blocks, make_tim
 from firebase_admin import db
 from gemini_client import call_gemini_schedule
 from scheduler import generate_schedule_prompt
+from nlu_utils import parse_task_from_text, is_task_description
 
 from linebot.v3.webhook import MessageEvent
 from linebot.v3.messaging import MessagingApi, ReplyMessageRequest, ApiClient, Configuration
@@ -28,7 +29,99 @@ def register_message_handlers(handler):
 
         text = event.message.text.strip()
         data = load_data(user_id)
-
+        
+        # 檢查是否為「新增作業」指令
+        if text == "新增作業":
+            handle_add_task_flow(event, user_id, text)
+            return
+            
+        # 檢查是否可能是自然語言任務描述
+        if is_task_description(text):
+            # 嘗試解析任務資訊
+            task_info = parse_task_from_text(text)
+            
+            # 如果成功解析出任務名稱
+            if task_info['task']:
+                # 將解析出的資訊存入 temp_task
+                set_temp_task(user_id, task_info)
+                
+                # 檢查是否所有必要資訊都已解析
+                missing_info = []
+                if not task_info['estimated_time']:
+                    missing_info.append('預估時間')
+                if not task_info['due']:
+                    missing_info.append('截止日期')
+                if not task_info['category']:
+                    missing_info.append('分類')
+                
+                if not missing_info:
+                    # 如果所有資訊都已解析，顯示確認訊息
+                    bubble = {
+                        "type": "bubble",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "spacing": "md",
+                            "contents": [
+                                {"type": "text", "text": "請確認任務資訊", "weight": "bold", "size": "lg"},
+                                {"type": "text", "text": f"任務：{task_info['task']}", "wrap": True},
+                                {"type": "text", "text": f"預估時間：{task_info['estimated_time']}小時", "wrap": True},
+                                {"type": "text", "text": f"截止日期：{task_info['due']}", "wrap": True},
+                                {"type": "text", "text": f"分類：{task_info['category']}", "wrap": True}
+                            ]
+                        },
+                        "footer": {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "spacing": "sm",
+                            "contents": [
+                                {
+                                    "type": "button",
+                                    "action": {
+                                        "type": "postback",
+                                        "label": "確認新增",
+                                        "data": "confirm_add_task"
+                                    },
+                                    "style": "primary"
+                                },
+                                {
+                                    "type": "button",
+                                    "action": {
+                                        "type": "postback",
+                                        "label": "取消",
+                                        "data": "cancel_add_task"
+                                    },
+                                    "style": "secondary"
+                                }
+                            ]
+                        }
+                    }
+                    
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[FlexMessage(
+                                    alt_text="確認任務資訊",
+                                    contents=FlexContainer.from_dict(bubble)
+                                )]
+                            )
+                        )
+                    return
+                else:
+                    # 如果有缺失資訊，設定狀態並引導使用者輸入
+                    set_user_state(user_id, f"awaiting_task_{missing_info[0].lower()}")
+                    reply = f"已記錄任務名稱：{task_info['task']}\n請輸入{missing_info[0]}："
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
+                        )
+                    return
+        
+        # 如果以上都不符合，繼續原有的處理邏輯
         if handle_add_task_flow(event, user_id, text):
             return
         
@@ -310,7 +403,7 @@ def register_message_handlers(handler):
                                 "label": "📝 手動選擇清除",
                                 "data": "clear_expired_select"
                             },
-                            "style": "secondary"
+                            "style": "primary"
                         },
                         {
                             "type": "button",
@@ -319,7 +412,8 @@ def register_message_handlers(handler):
                                 "label": "🗑️ 一鍵清除全部",
                                 "data": "clear_expired_all"
                             },
-                            "style": "primary"
+                            "style": "primary",
+                            "color": "#FF4444"  # 紅色
                         }
                     ]
                 }

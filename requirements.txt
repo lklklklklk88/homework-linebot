@@ -4,3 +4,4 @@ gunicorn
 firebase-admin
 python-dotenv
 google-generativeai
+jieba
