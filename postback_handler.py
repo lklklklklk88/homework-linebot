@@ -103,13 +103,22 @@ def register_postback_handlers(handler):
                 return
                 
             elif data == "complete_task":
-                # 檢查是否有任務
-                if not data:
-                    return "目前沒有任何作業可完成。"
+                # 載入任務數據
+                tasks = load_data(user_id)
+                if not tasks:
+                    reply = "目前沒有任何作業可完成。"
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
+                        )
+                    return
                 
                 # 建立完成作業的按鈕
                 buttons = []
-                for i, task in enumerate(data):
+                for i, task in enumerate(tasks):
                     if not task.get("done", False):
                         buttons.append({
                             "type": "button",
@@ -122,7 +131,15 @@ def register_postback_handlers(handler):
                         })
                 
                 if not buttons:
-                    return "目前沒有未完成的作業。"
+                    reply = "目前沒有未完成的作業。"
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
+                        )
+                    return
                 
                 bubble = {
                     "type": "bubble",
@@ -137,10 +154,75 @@ def register_postback_handlers(handler):
                     }
                 }
                 
-                return FlexMessage(
-                    alt_text="選擇要完成的作業",
-                    contents=FlexContainer.from_dict(bubble)
-                )
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=[FlexMessage(
+                                alt_text="選擇要完成的作業",
+                                contents=FlexContainer.from_dict(bubble)
+                            )]
+                        )
+                    )
+                return
+
+            # 處理完成特定作業
+            elif data.startswith("complete_task_"):
+                # 獲取任務索引
+                task_index = int(data.split("_")[-1])
+                
+                # 載入任務數據
+                tasks = load_data(user_id)
+                if not tasks:
+                    reply = "❌ 找不到任何作業"
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
+                        )
+                    return
+                
+                # 檢查索引是否有效
+                if task_index < 0 or task_index >= len(tasks):
+                    reply = "❌ 無效的作業編號"
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
+                        )
+                    return
+                
+                # 檢查任務是否已經完成
+                if tasks[task_index].get("done", False):
+                    reply = f"⚠️ 作業 {tasks[task_index]['task']} 已經完成了"
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
+                        )
+                    return
+                
+                # 更新任務狀態
+                tasks[task_index]["done"] = True
+                
+                # 保存更新後的數據
+                save_data(user_id, tasks)
+                
+                reply = f"✅ 已完成作業：{tasks[task_index]['task']}"
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=[TextMessage(text=reply)]
+                        )
+                    )
+                return
                 
             elif data == "set_remind_time":
                 # 直接顯示提醒時間設定選單
@@ -841,31 +923,11 @@ def register_postback_handlers(handler):
                     )
                 return
 
-            # 處理完成作業
-            if data.startswith("complete_task_"):
-                # 獲取任務索引
-                task_index = int(data.split("_")[-1])
-                
-                # 檢查索引是否有效
-                if task_index < 0 or task_index >= len(data):
-                    return "無效的作業編號。"
-                
-                # 檢查任務是否已經完成
-                if data[task_index].get("done", False):
-                    return "此作業已經完成了。"
-                
-                # 更新任務狀態
-                data[task_index]["done"] = True
-                
-                # 保存更新後的數據
-                save_data(user_id, data)
-                
-                return f"✅ 已完成作業：{data[task_index]['task']}"
-
-            # 處理清除已完成作業
-            if data == "clear_completed_all":
-                data = load_data(user_id)
-                if not data:
+            # 處理一鍵清除已完成作業
+            elif data == "clear_completed_all":
+                # 載入任務數據
+                tasks = load_data(user_id)
+                if not tasks:
                     reply = "✅ 目前沒有任何作業"
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(
@@ -877,13 +939,14 @@ def register_postback_handlers(handler):
                     return
 
                 # 過濾掉已完成的作業
-                filtered_data = [task for task in data if not task.get("done", False)]
-                if len(filtered_data) == len(data):
+                filtered_tasks = [task for task in tasks if not task.get("done", False)]
+                if len(filtered_tasks) == len(tasks):
                     reply = "✅ 沒有已完成的作業需要清除"
                 else:
-                    save_data(user_id, filtered_data)
-                    reply = f"✅ 已清除 {len(data) - len(filtered_data)} 個已完成的作業"
-
+                    # 保存更新後的數據
+                    save_data(user_id, filtered_tasks)
+                    reply = f"✅ 已清除 {len(tasks) - len(filtered_tasks)} 個已完成的作業"
+                
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(
                         ReplyMessageRequest(
@@ -893,8 +956,9 @@ def register_postback_handlers(handler):
                     )
                 return
 
-            # 處理清除已截止作業
-            if data == "clear_expired_all":
+            # 處理一鍵清除已截止作業
+            elif data == "clear_expired_all":
+                # 載入任務數據
                 tasks = load_data(user_id)
                 if not tasks:
                     reply = "✅ 目前沒有任何作業"
@@ -930,6 +994,7 @@ def register_postback_handlers(handler):
                 if expired_count == 0:
                     reply = "✅ 沒有已截止的作業需要清除"
                 else:
+                    # 保存更新後的數據
                     save_data(user_id, filtered_tasks)
                     reply = f"✅ 已清除 {expired_count} 個已截止的作業"
 
