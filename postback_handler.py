@@ -30,8 +30,16 @@ def register_postback_handlers(handler):
             user_id = event.source.user_id
             
             print(f"收到 postback 事件：{data}")  # 新增日誌
-                        
-            if data == "complete_task":
+
+            if data == "add_task":
+                handle_add_task(user_id, event.reply_token)
+                return
+            
+            elif data == "show_schedule":
+                handle_show_schedule(user_id, event.reply_token)
+                return
+
+            elif data == "complete_task":
                 # 載入任務數據
                 tasks = load_data(user_id)
                 if not tasks:
@@ -1180,5 +1188,18 @@ def handle_add_task(user_id, reply_token):
             ReplyMessageRequest(
                 reply_token=reply_token,
                 messages=messages
+            )
+        )
+
+def handle_show_schedule(user_id, reply_token):
+    from line_message_handler import get_today_schedule_for_user  # 避免 import 循環
+
+    response = get_today_schedule_for_user(user_id)
+
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=response if isinstance(response, list) else [TextMessage(text=response)]
             )
         )

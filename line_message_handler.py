@@ -36,52 +36,25 @@ def register_message_handlers(handler):
 
         # 只有當沒有流程進行中，才進行語意判斷與快速新增
         if not state:
-            if intent == "add_task":
-                # 回傳 Flex Bubble，觸發 postback data: add_task
-                bubble = {
-                    "type": "bubble",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "spacing": "md",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "📝 我們來新增作業吧！",
-                                "weight": "bold",
-                                "size": "lg"
-                            },
-                            {
-                                "type": "text",
-                                "text": "請點擊下方按鈕開始填寫作業資訊：",
-                                "size": "sm",
-                                "color": "#888888"
-                            },
-                            {
-                                "type": "button",
-                                "action": {
-                                    "type": "postback",
-                                    "label": "➕ 新增作業",
-                                    "data": "add_task"
-                                },
-                                "style": "primary"
-                            }
-                        ]
-                    }
-                }
+            intent = classify_intent_by_gemini(text)
 
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[
-                                FlexMessage(
-                                    alt_text="新增作業",
-                                    contents=FlexContainer.from_dict(bubble)
-                                )
-                            ]
-                        )
-                    )
+            if intent == "add_task":
+                trigger_postback(event, "add_task", "➕ 新增作業")
+                return
+            elif intent == "view_task":
+                trigger_postback(event, "view_tasks", "📋 查看作業")
+                return
+            elif intent == "complete_task":
+                trigger_postback(event, "complete_task", "✅ 完成作業")
+                return
+            elif intent == "set_reminder":
+                trigger_postback(event, "set_remind_time", "⏰ 設定提醒時間")
+                return
+            elif intent == "clear_completed":
+                trigger_postback(event, "clear_completed", "🧹 清除已完成作業")
+                return
+            elif intent == "clear_expired":
+                trigger_postback(event, "clear_expired", "🗑️ 清除已截止作業")
                 return
 
         # 將意圖轉為原有的指令字串
@@ -153,6 +126,19 @@ def register_message_handlers(handler):
                                 contents=FlexContainer.from_dict(bubble)
                             )
                         ]
+                    )
+                )
+            return
+        
+        elif data == "show_schedule":
+            from line_message_handler import get_today_schedule_for_user  # 放在函式內避免循環 import
+            response = get_today_schedule_for_user(user_id)
+
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=response if isinstance(response, list) else [TextMessage(text=response)]
                     )
                 )
             return
@@ -288,3 +274,40 @@ def get_weekly_progress(user_id):
         "total_hours": total_hours,
         "avg_hours_per_day": avg_hours_per_day
     }
+
+def trigger_postback(event, data, label):
+    bubble = {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": f"👉 請點擊下方按鈕執行：{label}",
+                    "wrap": True
+                },
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": label,
+                        "data": data
+                    },
+                    "style": "primary"
+                }
+            ]
+        }
+    }
+
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[FlexMessage(
+                    alt_text=label,
+                    contents=FlexContainer.from_dict(bubble)
+                )]
+            )
+        )
