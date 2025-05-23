@@ -22,13 +22,6 @@ logger = logging.getLogger(__name__)
 
 configuration = Configuration(access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
 
-# 常數定義
-ACTION_TYPES = {
-    'done': '完成',
-    'delete': '刪除',
-    'delay': '延後'
-}
-
 def register_postback_handlers(handler):
     @handler.add(PostbackEvent)
     def handle_postback(event):
