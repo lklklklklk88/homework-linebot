@@ -29,6 +29,7 @@ def register_message_handlers(handler):
 
         text = event.message.text.strip()
         data = load_data(user_id)
+        state = get_user_state(user_id) 
 
         # 使用 Gemini 判斷自然語言意圖
         intent = classify_intent_by_gemini(text)
@@ -36,29 +37,33 @@ def register_message_handlers(handler):
         text = event.message.text.strip()
         intent = classify_intent_by_gemini(text)
 
-        # 加這一段 ↓↓↓
-        if intent == "add_task" and any(keyword in text for keyword in ["交", "要做", "要完成"]):
-            task_data = parse_task_from_text(text)
-            if task_data:
-                add_task(user_id, {
-                    "task": task_data["task"],
-                    "estimated_time": float(task_data["estimated_time"]),
-                    "category": task_data["category"],
-                    "due": task_data["due"],
-                    "done": False
-                })
-                reply = f"✅ 已新增作業：{task_data['task']}（{task_data['estimated_time']} 小時｜{task_data['category']}｜截止：{task_data['due']}）"
-            else:
-                reply = "❌ 無法解析你輸入的內容，請換個說法再試一次"
+        # 只有當沒有流程進行中，才進行語意判斷與快速新增
+        intent = "unknown"
+        if not state:
+            intent = classify_intent_by_gemini(text)
 
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[TextMessage(text=reply)]
+            if intent == "add_task" and any(keyword in text for keyword in ["交", "要做", "要考", "要完成", "要教"]):
+                task_data = parse_task_from_text(text)
+                if task_data:
+                    add_task(user_id, {
+                        "task": task_data["task"],
+                        "estimated_time": float(task_data["estimated_time"]),
+                        "category": task_data["category"],
+                        "due": task_data["due"],
+                        "done": False
+                    })
+                    reply = f"✅ 已新增作業：{task_data['task']}（{task_data['estimated_time']} 小時｜{task_data['category']}｜截止：{task_data['due']}）"
+                else:
+                    reply = "❌ 無法解析你輸入的內容，請換個說法再試一次"
+
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
                         )
-                    )
-                return
+                    return
 
         # 將意圖轉為原有的指令字串
         intent_map = {
