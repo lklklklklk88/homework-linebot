@@ -30,137 +30,9 @@ def register_postback_handlers(handler):
             user_id = event.source.user_id
             
             print(f"收到 postback 事件：{data}")  # 新增日誌
-            
-            # 處理操作頁面的按鈕事件
-            if data == "add_task":
-                # 直接進入新增作業流程
-                set_user_state(user_id, "awaiting_task_name")
-                clear_temp_task(user_id)
-                
-                # 獲取歷史記錄
-                name_history, _, _ = get_task_history(user_id)
-                
-                # 建立歷史記錄按鈕
-                buttons = []
-                for name in name_history[-3:]:  # 最多顯示3個
-                    buttons.append({
-                        "type": "button",
-                        "action": {
-                            "type": "postback",
-                            "label": name,
-                            "data": f"select_task_name_{name}"
-                        },
-                        "style": "secondary"
-                    })
-                
-                # 添加取消按鈕
-                buttons.append({
-                    "type": "button",
-                    "action": {
-                        "type": "postback",
-                        "label": "❌ 取消",
-                        "data": "cancel_add_task"
-                    },
-                    "style": "secondary"
-                })
-
-                bubble = {
-                    "type": "bubble",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "spacing": "md",
-                        "contents": [
-                            {"type": "text", "text": "📝 請輸入作業名稱", "weight": "bold", "size": "lg"},
-                            {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
-                            *buttons
-                        ]
-                    }
-                }
-
-                messages = [
-                    FlexMessage(
-                        alt_text="請輸入作業名稱",
-                        contents=FlexContainer.from_dict(bubble)
-                    ),
-                    TextMessage(text="請輸入作業名稱：")
-                ]
-
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=messages
-                        )
-                    )
-                return
-                
-            elif data == "complete_task":
-                # 載入任務數據
-                tasks = load_data(user_id)
-                if not tasks:
-                    reply = "目前沒有任何作業可完成。"
-                    with ApiClient(configuration) as api_client:
-                        MessagingApi(api_client).reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[TextMessage(text=reply)]
-                            )
-                        )
-                    return
-                
-                # 建立完成作業的按鈕
-                buttons = []
-                for i, task in enumerate(tasks):
-                    if not task.get("done", False):
-                        buttons.append({
-                            "type": "button",
-                            "action": {
-                                "type": "postback",
-                                "label": f"✅ {task['task']}",
-                                "data": f"complete_task_{i}"
-                            },
-                            "style": "secondary"
-                        })
-                
-                if not buttons:
-                    reply = "目前沒有未完成的作業。"
-                    with ApiClient(configuration) as api_client:
-                        MessagingApi(api_client).reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[TextMessage(text=reply)]
-                            )
-                        )
-                    return
-                
-                bubble = {
-                    "type": "bubble",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "spacing": "md",
-                        "contents": [
-                            {"type": "text", "text": "選擇要完成的作業", "weight": "bold", "size": "lg"},
-                            *buttons
-                        ]
-                    }
-                }
-                
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[FlexMessage(
-                                alt_text="選擇要完成的作業",
-                                contents=FlexContainer.from_dict(bubble)
-                            )]
-                        )
-                    )
-                return
 
             # 處理完成特定作業
-            elif data.startswith("complete_task_"):
+            if data.startswith("complete_task_"):
                 try:
                     # 獲取任務索引
                     task_index = int(data.split("_")[-1])
@@ -1189,3 +1061,60 @@ def register_postback_handlers(handler):
                         messages=[TextMessage(text="❌ 發生錯誤，請稍後再試")]
                     )
                 )
+                
+def handle_add_task(user_id, reply_token):
+    set_user_state(user_id, "awaiting_task_name")
+    clear_temp_task(user_id)
+    name_history, _, _ = get_task_history(user_id)
+
+    buttons = []
+    for name in name_history[-3:]:
+        buttons.append({
+            "type": "button",
+            "action": {
+                "type": "postback",
+                "label": name,
+                "data": f"select_task_name_{name}"
+            },
+            "style": "secondary"
+        })
+
+    buttons.append({
+        "type": "button",
+        "action": {
+            "type": "postback",
+            "label": "❌ 取消",
+            "data": "cancel_add_task"
+        },
+        "style": "secondary"
+    })
+
+    bubble = {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": [
+                {"type": "text", "text": "📝 請輸入作業名稱", "weight": "bold", "size": "lg"},
+                {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
+                *buttons
+            ]
+        }
+    }
+
+    messages = [
+        FlexMessage(
+            alt_text="請輸入作業名稱",
+            contents=FlexContainer.from_dict(bubble)
+        ),
+        TextMessage(text="請輸入作業名稱：")
+    ]
+
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=messages
+            )
+        )
