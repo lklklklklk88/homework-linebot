@@ -7,6 +7,7 @@ from firebase_utils import (
     get_task_history, update_task_history
 )
 
+from intent_utils import classify_intent_by_gemini
 from flex_utils import make_schedule_carousel, extract_schedule_blocks, make_timetable_card, make_weekly_progress_card
 from firebase_admin import db
 from gemini_client import call_gemini_schedule
@@ -20,6 +21,20 @@ configuration = Configuration(access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"
 def register_message_handlers(handler):
     @handler.add(MessageEvent)
     def handle_message(event):
+
+        # 使用 Gemini 判斷自然語言意圖
+        intent = classify_intent_by_gemini(text)
+
+        # 將意圖轉為原有的指令字串
+        intent_map = {
+            "add_task": "新增作業",
+            "view_task": "查看作業",
+            "complete_task": "完成作業",
+            "set_reminder": "提醒時間"
+        }
+        if intent in intent_map:
+            text = intent_map[intent]
+
         user_id = event.source.user_id
 
         if event.message.type != 'text':
