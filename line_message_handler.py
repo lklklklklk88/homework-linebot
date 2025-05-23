@@ -22,6 +22,14 @@ def register_message_handlers(handler):
     @handler.add(MessageEvent)
     def handle_message(event):
 
+        user_id = event.source.user_id
+
+        if event.message.type != 'text':
+            return
+
+        text = event.message.text.strip()
+        data = load_data(user_id)
+
         # 使用 Gemini 判斷自然語言意圖
         intent = classify_intent_by_gemini(text)
 
@@ -34,14 +42,6 @@ def register_message_handlers(handler):
         }
         if intent in intent_map:
             text = intent_map[intent]
-
-        user_id = event.source.user_id
-
-        if event.message.type != 'text':
-            return
-
-        text = event.message.text.strip()
-        data = load_data(user_id)
         
         # 檢查是否為「新增作業」指令
         if text == "新增作業":
