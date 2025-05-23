@@ -57,18 +57,82 @@ def register_message_handlers(handler):
                 trigger_postback(event, "clear_expired", "🗑️ 清除已截止作業")
                 return
 
-        # 將意圖轉為原有的指令字串
-        intent_map = {
-            "add_task": "新增作業",
-            "view_task": "查看作業",
-            "complete_task": "完成作業",
-            "set_reminder": "提醒時間",
-            "clear_completed": "清除已完成作業",
-            "clear_expired": "清除已截止作業",
-            "show_schedule": "今日排程"
-        }
-        if intent in intent_map:
-            text = intent_map[intent]      
+            # 將意圖轉為原有的指令字串
+            intent_map = {
+                "add_task": "新增作業",
+                "view_task": "查看作業",
+                "complete_task": "完成作業",
+                "set_reminder": "提醒時間",
+                "clear_completed": "清除已完成作業",
+                "clear_expired": "清除已截止作業",
+                "show_schedule": "今日排程"
+            }
+
+            if intent in intent_map:
+                text = intent_map[intent]      
+
+        # 🌟 處理使用者輸入作業名稱
+        if state == "awaiting_task_name":
+            temp_task = {"task": text}
+            set_temp_task(user_id, temp_task)
+            set_user_state(user_id, "awaiting_task_time")
+
+            # 接著顯示「請輸入預估完成時間」的 UI
+            from firebase_utils import get_task_history
+            _, _, time_history = get_task_history(user_id)
+
+            bubble = {
+                "type": "bubble",
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "md",
+                    "contents": [
+                        {"type": "text", "text": "⏰ 請輸入預估完成時間", "weight": "bold", "size": "lg"},
+                        {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"}
+                    ]
+                }
+            }
+
+            if time_history:
+                for time in time_history:
+                    bubble["body"]["contents"].append({
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": time,
+                            "data": f"select_time_{time.replace('小時', '')}"
+                        },
+                        "style": "secondary"
+                    })
+
+            bubble["body"]["contents"].append({
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": "❌ 取消",
+                    "data": "cancel_add_task"
+                },
+                "style": "secondary"
+            })
+
+            messages = [
+                FlexMessage(
+                    alt_text="請輸入預估完成時間",
+                    contents=FlexContainer.from_dict(bubble)
+                ),
+                TextMessage(text="請輸入預估完成時間（小時）：")
+            ]
+
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=messages
+                    )
+                )
+            return
+
 
         elif text == "操作":
             bubble = {
