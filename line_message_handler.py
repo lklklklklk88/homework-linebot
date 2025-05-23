@@ -4,9 +4,9 @@ import re
 from firebase_utils import (
     load_data, save_data, set_user_state, get_user_state,
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task,
-    get_task_history, update_task_history
+    get_task_history, update_task_history, add_task
 )
-
+from task_parser import parse_task_from_text
 from intent_utils import classify_intent_by_gemini
 from flex_utils import make_schedule_carousel, extract_schedule_blocks, make_timetable_card, make_weekly_progress_card
 from firebase_admin import db
@@ -33,12 +33,42 @@ def register_message_handlers(handler):
         # 使用 Gemini 判斷自然語言意圖
         intent = classify_intent_by_gemini(text)
 
+        text = event.message.text.strip()
+        intent = classify_intent_by_gemini(text)
+
+        # 加這一段 ↓↓↓
+        if intent == "add_task" and any(keyword in text for keyword in ["交", "要做", "要完成"]):
+            task_data = parse_task_from_text(text)
+            if task_data:
+                add_task(user_id, {
+                    "task": task_data["task"],
+                    "estimated_time": float(task_data["estimated_time"]),
+                    "category": task_data["category"],
+                    "due": task_data["due"],
+                    "done": False
+                })
+                reply = f"✅ 已新增作業：{task_data['task']}（{task_data['estimated_time']} 小時｜{task_data['category']}｜截止：{task_data['due']}）"
+            else:
+                reply = "❌ 無法解析你輸入的內容，請換個說法再試一次"
+
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=[TextMessage(text=reply)]
+                        )
+                    )
+                return
+
         # 將意圖轉為原有的指令字串
         intent_map = {
             "add_task": "新增作業",
             "view_task": "查看作業",
             "complete_task": "完成作業",
-            "set_reminder": "提醒時間"
+            "set_reminder": "提醒時間",
+            "clear_completed": "清除已完成作業",
+            "clear_expired": "清除已截止作業",
+            "show_schedule": "今日排程"
         }
         if intent in intent_map:
             text = intent_map[intent]
