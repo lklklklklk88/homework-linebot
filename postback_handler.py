@@ -30,9 +30,73 @@ def register_postback_handlers(handler):
             user_id = event.source.user_id
             
             print(f"收到 postback 事件：{data}")  # 新增日誌
+                        
+            if data == "complete_task":
+                # 載入任務數據
+                tasks = load_data(user_id)
+                if not tasks:
+                    reply = "目前沒有任何作業可完成。"
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
+                        )
+                    return
+                
+                # 建立完成作業的按鈕
+                buttons = []
+                for i, task in enumerate(tasks):
+                    if not task.get("done", False):
+                        buttons.append({
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": f"✅ {task['task']}",
+                                "data": f"complete_task_{i}"
+                            },
+                            "style": "secondary"
+                        })
+                
+                if not buttons:
+                    reply = "目前沒有未完成的作業。"
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply)]
+                            )
+                        )
+                    return
+                
+                bubble = {
+                    "type": "bubble",
+                    "body": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "spacing": "md",
+                        "contents": [
+                            {"type": "text", "text": "選擇要完成的作業", "weight": "bold", "size": "lg"},
+                            *buttons
+                        ]
+                    }
+                }
+                
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=[FlexMessage(
+                                alt_text="選擇要完成的作業",
+                                contents=FlexContainer.from_dict(bubble)
+                            )]
+                        )
+                    )
+                return
 
             # 處理完成特定作業
-            if data.startswith("complete_task_"):
+            elif data.startswith("complete_task_"):
                 try:
                     # 獲取任務索引
                     task_index = int(data.split("_")[-1])
@@ -1061,7 +1125,7 @@ def register_postback_handlers(handler):
                         messages=[TextMessage(text="❌ 發生錯誤，請稍後再試")]
                     )
                 )
-                
+
 def handle_add_task(user_id, reply_token):
     set_user_state(user_id, "awaiting_task_name")
     clear_temp_task(user_id)
