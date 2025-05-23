@@ -28,402 +28,36 @@ def register_postback_handlers(handler):
         try:
             data = event.postback.data
             user_id = event.source.user_id
+            reply_token = event.reply_token
             
             print(f"收到 postback 事件：{data}")  # 新增日誌
 
             if data == "add_task":
-                handle_add_task(user_id, event.reply_token)
+                handle_add_task(user_id, reply_token)
                 return
-            
+
             elif data == "show_schedule":
-                handle_show_schedule(user_id, event.reply_token)
+                handle_show_schedule(user_id, reply_token)
+                return
+
+            elif data == "view_tasks":
+                handle_view_tasks(user_id, reply_token)
                 return
 
             elif data == "complete_task":
-                # 載入任務數據
-                tasks = load_data(user_id)
-                if not tasks:
-                    reply = "目前沒有任何作業可完成。"
-                    with ApiClient(configuration) as api_client:
-                        MessagingApi(api_client).reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[TextMessage(text=reply)]
-                            )
-                        )
-                    return
-                
-                # 建立完成作業的按鈕
-                buttons = []
-                for i, task in enumerate(tasks):
-                    if not task.get("done", False):
-                        buttons.append({
-                            "type": "button",
-                            "action": {
-                                "type": "postback",
-                                "label": f"✅ {task['task']}",
-                                "data": f"complete_task_{i}"
-                            },
-                            "style": "secondary"
-                        })
-                
-                if not buttons:
-                    reply = "目前沒有未完成的作業。"
-                    with ApiClient(configuration) as api_client:
-                        MessagingApi(api_client).reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[TextMessage(text=reply)]
-                            )
-                        )
-                    return
-                
-                bubble = {
-                    "type": "bubble",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "spacing": "md",
-                        "contents": [
-                            {"type": "text", "text": "選擇要完成的作業", "weight": "bold", "size": "lg"},
-                            *buttons
-                        ]
-                    }
-                }
-                
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[FlexMessage(
-                                alt_text="選擇要完成的作業",
-                                contents=FlexContainer.from_dict(bubble)
-                            )]
-                        )
-                    )
+                handle_complete_task_direct(user_id, reply_token)
                 return
 
-            # 處理完成特定作業
-            elif data.startswith("complete_task_"):
-                try:
-                    # 獲取任務索引
-                    task_index = int(data.split("_")[-1])
-                    
-                    # 載入任務數據
-                    tasks = load_data(user_id)
-                    if not tasks:
-                        reply = "❌ 找不到任何作業"
-                        with ApiClient(configuration) as api_client:
-                            MessagingApi(api_client).reply_message(
-                                ReplyMessageRequest(
-                                    reply_token=event.reply_token,
-                                    messages=[TextMessage(text=reply)]
-                                )
-                            )
-                        return
-                    
-                    # 檢查索引是否有效
-                    if task_index < 0 or task_index >= len(tasks):
-                        reply = "❌ 無效的作業編號"
-                        with ApiClient(configuration) as api_client:
-                            MessagingApi(api_client).reply_message(
-                                ReplyMessageRequest(
-                                    reply_token=event.reply_token,
-                                    messages=[TextMessage(text=reply)]
-                                )
-                            )
-                        return
-                    
-                    # 檢查任務是否已經完成
-                    if tasks[task_index].get("done", False):
-                        reply = f"⚠️ 作業 {tasks[task_index]['task']} 已經完成了"
-                        with ApiClient(configuration) as api_client:
-                            MessagingApi(api_client).reply_message(
-                                ReplyMessageRequest(
-                                    reply_token=event.reply_token,
-                                    messages=[TextMessage(text=reply)]
-                                )
-                            )
-                        return
-                    
-                    # 更新任務狀態
-                    tasks[task_index]["done"] = True
-                    
-                    # 保存更新後的數據
-                    try:
-                        save_data(user_id, tasks)
-                        reply = f"✅ 已完成作業：{tasks[task_index]['task']}"
-                    except Exception as e:
-                        print(f"保存數據時發生錯誤：{str(e)}")
-                        reply = "❌ 保存數據時發生錯誤，請稍後再試"
-                    
-                    with ApiClient(configuration) as api_client:
-                        MessagingApi(api_client).reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[TextMessage(text=reply)]
-                            )
-                        )
-                    return
-                except Exception as e:
-                    print(f"處理完成作業時發生錯誤：{str(e)}")
-                    reply = "❌ 發生錯誤，請稍後再試"
-                    with ApiClient(configuration) as api_client:
-                        MessagingApi(api_client).reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[TextMessage(text=reply)]
-                            )
-                        )
-                    return
-                
             elif data == "set_remind_time":
-                # 直接顯示提醒時間設定選單
-                current_time = db.reference(f"users/{user_id}/remind_time").get() or "08:00"
-
-                bubble = {
-                    "type": "bubble",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "spacing": "md",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": f"目前提醒時間：{current_time}",
-                                "weight": "bold",
-                                "size": "md"
-                            },
-                            {
-                                "type": "text",
-                                "text": "請選擇新的提醒時間：",
-                                "size": "sm",
-                                "color": "#888888"
-                            },
-                            {
-                                "type": "button",
-                                "action": {
-                                    "type": "datetimepicker",
-                                    "label": "⏰ 選擇時間",
-                                    "data": "select_remind_time",
-                                    "mode": "time",
-                                    "initial": current_time,
-                                    "max": "23:59",
-                                    "min": "00:00"
-                                },
-                                "style": "primary"
-                            }
-                        ]
-                    }
-                }
-
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[FlexMessage(
-                                alt_text="設定提醒時間",
-                                contents=FlexContainer.from_dict(bubble)
-                            )]
-                        )
-                    )
+                handle_set_remind_time(user_id, reply_token)
                 return
-                
-            elif data == "view_tasks":
-                # 直接顯示作業清單
-                data = load_data(user_id)
-                if not data:
-                    reply = "目前沒有任何作業。"
-                    with ApiClient(configuration) as api_client:
-                        MessagingApi(api_client).reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[TextMessage(text=reply)]
-                            )
-                        )
-                    return
 
-                now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
-                rows = []
-
-                for i, task in enumerate(data):
-                    done = task.get("done", False)
-                    due = task.get("due", "未設定")
-                    symbol = "✅" if done else "🔲"
-                    label = ""
-
-                    if not done and due != "未設定":
-                        try:
-                            due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
-                            if due_date < now:
-                                symbol = "❌"
-                            elif due_date == now:
-                                label = "\n(🔥今天到期)"
-                            elif due_date == now + datetime.timedelta(days=1):
-                                label = "\n(⚠️明天到期)"
-                        except:
-                            pass
-
-                    rows.append({
-                        "type": "box",
-                        "layout": "horizontal",
-                        "contents": [
-                            {"type": "text", "text": f"{i+1}.", "size": "sm", "flex": 1},
-                            {"type": "text", "text": f"{symbol} {task['task']}", "size": "sm", "flex": 6, "wrap": True, "maxLines": 3},
-                            {"type": "text", "text": f"{due}{label}", "size": "sm", "flex": 5, "wrap": True}
-                        ]
-                    })
-
-                bubble = {
-                    "type": "bubble",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "spacing": "sm",
-                        "contents": [
-                            {"type": "text", "text": "📋 你的作業清單：", "weight": "bold", "size": "md"},
-                            {"type": "separator"},
-                            *rows
-                        ]
-                    }
-                }
-
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[FlexMessage(
-                                alt_text="作業清單",
-                                contents=FlexContainer.from_dict(bubble)
-                            )]
-                        )
-                    )
-                return
-                
             elif data == "clear_completed":
-                # 直接顯示清除已完成作業選單
-                data = load_data(user_id)
-                completed_tasks = [task for task in data if task.get("done", False)]
-                if not completed_tasks:
-                    reply = "✅ 沒有已完成的作業需要清除。"
-                    with ApiClient(configuration) as api_client:
-                        MessagingApi(api_client).reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[TextMessage(text=reply)]
-                            )
-                        )
-                    return
-
-                bubble = {
-                    "type": "bubble",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "spacing": "md",
-                        "contents": [
-                            {"type": "text", "text": "你想怎麼清除已完成作業？", "weight": "bold", "size": "md"},
-                            {
-                                "type": "button",
-                                "action": {
-                                    "type": "postback",
-                                    "label": "📝 手動選擇清除",
-                                    "data": "clear_completed_select"
-                                },
-                                "style": "primary"
-                            },
-                            {
-                                "type": "button",
-                                "action": {
-                                    "type": "postback",
-                                    "label": "🧹 一鍵清除全部",
-                                    "data": "clear_completed_all"
-                                },
-                                "style": "primary",
-                                "color": "#FF4444"
-                            }
-                        ]
-                    }
-                }
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[FlexMessage(
-                                alt_text="清除已完成作業",
-                                contents=FlexContainer.from_dict(bubble)
-                            )]
-                        )
-                    )
+                handle_clear_completed(user_id, reply_token)
                 return
-                
+
             elif data == "clear_expired":
-                # 直接顯示清除已截止作業選單
-                data = load_data(user_id)
-                now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
-                expired_tasks = []
-                for i, task in enumerate(data):
-                    due = task.get("due", "未設定")
-                    done = task.get("done", False)
-                    if not done and due != "未設定":
-                        try:
-                            due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
-                            if due_date < now:
-                                expired_tasks.append((i, task))
-                        except:
-                            pass
-
-                if not expired_tasks:
-                    reply = "✅ 沒有需要清除的已截止作業。"
-                    with ApiClient(configuration) as api_client:
-                        MessagingApi(api_client).reply_message(
-                            ReplyMessageRequest(
-                                reply_token=event.reply_token,
-                                messages=[TextMessage(text=reply)]
-                            )
-                        )
-                    return
-
-                bubble = {
-                    "type": "bubble",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "spacing": "md",
-                        "contents": [
-                            {"type": "text", "text": "你想怎麼清除已截止的作業？", "weight": "bold", "size": "md"},
-                            {
-                                "type": "button",
-                                "action": {
-                                    "type": "postback",
-                                    "label": "📝 手動選擇清除",
-                                    "data": "clear_expired_select"
-                                },
-                                "style": "primary"
-                            },
-                            {
-                                "type": "button",
-                                "action": {
-                                    "type": "postback",
-                                    "label": "🗑️ 一鍵清除全部",
-                                    "data": "clear_expired_all"
-                                },
-                                "style": "primary",
-                                "color": "#FF4444"
-                            }
-                        ]
-                    }
-                }
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=[FlexMessage(
-                                alt_text="清除已截止作業",
-                                contents=FlexContainer.from_dict(bubble)
-                            )]
-                        )
-                    )
+                handle_clear_expired(user_id, reply_token)
                 return
             
             # 處理其他現有的 postback 事件
@@ -491,7 +125,7 @@ def register_postback_handlers(handler):
                     raise e
 
             # 處理取消操作
-            if data == "cancel_add_task":
+            elif data == "cancel_add_task":
                 clear_temp_task(user_id)
                 clear_user_state(user_id)
                 with ApiClient(configuration) as api_client:
@@ -504,7 +138,7 @@ def register_postback_handlers(handler):
                 return
 
             # 處理選擇作業名稱
-            if data.startswith("select_task_name_"):
+            elif data.startswith("select_task_name_"):
                 task_name = data.replace("select_task_name_", "")
                 temp_task = {"task": task_name}
                 set_temp_task(user_id, temp_task)
@@ -569,7 +203,7 @@ def register_postback_handlers(handler):
                 return
 
             # 處理選擇歷史時間
-            if data.startswith("select_time_"):
+            elif data.startswith("select_time_"):
                 time_value = data.replace("select_time_", "")
                 temp_task = get_temp_task(user_id)
                 temp_task["estimated_time"] = float(time_value)
@@ -635,7 +269,7 @@ def register_postback_handlers(handler):
                 return
 
             # 處理選擇歷史類型
-            if data.startswith("select_type_"):
+            elif data.startswith("select_type_"):
                 type_value = data.replace("select_type_", "")
                 temp_task = get_temp_task(user_id)
                 temp_task["category"] = type_value
@@ -699,7 +333,7 @@ def register_postback_handlers(handler):
                 return
 
             # 處理選擇截止日期
-            if data == "select_task_due":
+            elif data == "select_task_due":
                 # 從 postback 參數中獲取日期
                 date = event.postback.params.get('date', '')
                 if date:
@@ -775,7 +409,7 @@ def register_postback_handlers(handler):
                 return
 
             # 處理不設定截止日期
-            if data == "no_due_date":
+            elif data == "no_due_date":
                 temp_task = get_temp_task(user_id)
                 if not temp_task:
                     clear_temp_task(user_id)
@@ -844,7 +478,7 @@ def register_postback_handlers(handler):
                 return
 
             # 處理選擇提醒時間
-            if data == "select_remind_time":
+            elif data == "select_remind_time":
                 # 從 postback 參數中獲取時間
                 time = event.postback.params.get('time', '')
                 if not time:
@@ -1203,3 +837,59 @@ def handle_show_schedule(user_id, reply_token):
                 messages=response if isinstance(response, list) else [TextMessage(text=response)]
             )
         )
+def handle_view_tasks(user_id, reply_token):
+    from flex_utils import make_schedule_carousel
+    tasks = load_data(user_id)
+    if not tasks:
+        reply = "目前沒有任何作業。"
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
+            )
+        return
+
+    # 顯示作業卡片
+    card = make_schedule_carousel(tasks)
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(reply_token=reply_token, messages=[FlexMessage(
+                alt_text="作業清單", contents=FlexContainer.from_dict(card)
+            )])
+        )
+
+def handle_complete_task_direct(user_id, reply_token):
+    from postback_handler import register_postback_handlers  # 防止循環 import
+    event = type("Event", (), {
+        "postback": type("Postback", (), {"data": "complete_task"}),
+        "source": type("Source", (), {"user_id": user_id}),
+        "reply_token": reply_token
+    })
+    register_postback_handlers(lambda _: None).handle_postback(event)
+
+def handle_set_remind_time(user_id, reply_token):
+    # 手動觸發原本 postback handler 的 set_remind_time UI
+    from postback_handler import register_postback_handlers
+    event = type("Event", (), {
+        "postback": type("Postback", (), {"data": "set_remind_time"}),
+        "source": type("Source", (), {"user_id": user_id}),
+        "reply_token": reply_token
+    })
+    register_postback_handlers(lambda _: None).handle_postback(event)
+
+def handle_clear_completed(user_id, reply_token):
+    from postback_handler import register_postback_handlers
+    event = type("Event", (), {
+        "postback": type("Postback", (), {"data": "clear_completed"}),
+        "source": type("Source", (), {"user_id": user_id}),
+        "reply_token": reply_token
+    })
+    register_postback_handlers(lambda _: None).handle_postback(event)
+
+def handle_clear_expired(user_id, reply_token):
+    from postback_handler import register_postback_handlers
+    event = type("Event", (), {
+        "postback": type("Postback", (), {"data": "clear_expired"}),
+        "source": type("Source", (), {"user_id": user_id}),
+        "reply_token": reply_token
+    })
+    register_postback_handlers(lambda _: None).handle_postback(event)

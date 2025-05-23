@@ -6,6 +6,15 @@ from firebase_utils import (
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task,
     get_task_history, update_task_history, add_task
 )
+from postback_handler import (
+    handle_add_task,
+    handle_show_schedule,
+    handle_complete_task_direct,
+    handle_view_tasks,
+    handle_set_remind_time,
+    handle_clear_completed,
+    handle_clear_expired
+)
 from task_parser import parse_task_from_text
 from intent_utils import classify_intent_by_gemini
 from flex_utils import make_schedule_carousel, extract_schedule_blocks, make_timetable_card, make_weekly_progress_card
@@ -39,37 +48,26 @@ def register_message_handlers(handler):
             intent = classify_intent_by_gemini(text)
 
             if intent == "add_task":
-                trigger_postback(event, "add_task", "➕ 新增作業")
+                handle_add_task(user_id, event.reply_token)
                 return
             elif intent == "view_task":
-                trigger_postback(event, "view_tasks", "📋 查看作業")
+                handle_view_tasks(user_id, event.reply_token)
                 return
             elif intent == "complete_task":
-                trigger_postback(event, "complete_task", "✅ 完成作業")
+                handle_complete_task_direct(user_id, event.reply_token)
                 return
             elif intent == "set_reminder":
-                trigger_postback(event, "set_remind_time", "⏰ 設定提醒時間")
+                handle_set_remind_time(user_id, event.reply_token)
                 return
             elif intent == "clear_completed":
-                trigger_postback(event, "clear_completed", "🧹 清除已完成作業")
+                handle_clear_completed(user_id, event.reply_token)
                 return
             elif intent == "clear_expired":
-                trigger_postback(event, "clear_expired", "🗑️ 清除已截止作業")
+                handle_clear_expired(user_id, event.reply_token)
                 return
-
-            # 將意圖轉為原有的指令字串
-            intent_map = {
-                "add_task": "新增作業",
-                "view_task": "查看作業",
-                "complete_task": "完成作業",
-                "set_reminder": "提醒時間",
-                "clear_completed": "清除已完成作業",
-                "clear_expired": "清除已截止作業",
-                "show_schedule": "今日排程"
-            }
-
-            if intent in intent_map:
-                text = intent_map[intent]      
+            elif intent == "show_schedule":
+                handle_show_schedule(user_id, event.reply_token)
+                return 
 
         # 🌟 處理使用者輸入作業名稱
         if state == "awaiting_task_name":
@@ -190,19 +188,6 @@ def register_message_handlers(handler):
                                 contents=FlexContainer.from_dict(bubble)
                             )
                         ]
-                    )
-                )
-            return
-        
-        elif data == "show_schedule":
-            from line_message_handler import get_today_schedule_for_user  # 放在函式內避免循環 import
-            response = get_today_schedule_for_user(user_id)
-
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=response if isinstance(response, list) else [TextMessage(text=response)]
                     )
                 )
             return
@@ -338,40 +323,3 @@ def get_weekly_progress(user_id):
         "total_hours": total_hours,
         "avg_hours_per_day": avg_hours_per_day
     }
-
-def trigger_postback(event, data, label):
-    bubble = {
-        "type": "bubble",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "md",
-            "contents": [
-                {
-                    "type": "text",
-                    "text": f"👉 請點擊下方按鈕執行：{label}",
-                    "wrap": True
-                },
-                {
-                    "type": "button",
-                    "action": {
-                        "type": "postback",
-                        "label": label,
-                        "data": data
-                    },
-                    "style": "primary"
-                }
-            ]
-        }
-    }
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[FlexMessage(
-                    alt_text=label,
-                    contents=FlexContainer.from_dict(bubble)
-                )]
-            )
-        )
