@@ -53,7 +53,7 @@ def handle_task_name_input(user_id: str, text: str, reply_token: str):
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(
-                reply_token,
+                reply_token=reply_token,
                 messages=[
                     FlexMessage(alt_text="請輸入預估完成時間",
                                 contents=FlexContainer.from_dict(bubble)),
@@ -73,7 +73,7 @@ def handle_estimated_time_input(user_id: str, text: str, reply_token: str):
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
                 ReplyMessageRequest(
-                    reply_token,
+                    reply_token=reply_token,
                     messages=[
                         TextMessage(text="⚠️ 請輸入有效的時間，例如 2、2.5、2小時、兩小時")
                     ]
@@ -98,8 +98,8 @@ def handle_estimated_time_input(user_id: str, text: str, reply_token: str):
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(
-                reply_token,messages=
-                [
+                reply_token=reply_token,
+                messages=[
                     FlexMessage(alt_text="請輸入作業類型",
                                 contents=FlexContainer.from_dict(bubble)),
                     TextMessage(text="請輸入作業類型：")
@@ -145,7 +145,7 @@ def handle_task_type_input(user_id: str, text: str, reply_token: str):
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(
-                reply_token,
+                reply_token=reply_token,
                 messages=[
                     FlexMessage(
                         alt_text="請選擇截止日期",
@@ -167,6 +167,8 @@ def register_message_handlers(handler):
         text = event.message.text.strip()
         state = get_user_state(user_id) 
 
+        # ============= 修復區域：處理用戶狀態 =============
+        # 如果用戶正在進行新增作業流程，優先處理狀態相關的輸入
         if state == "awaiting_task_name":
             handle_task_name_input(user_id, text, event.reply_token)
             return
@@ -176,7 +178,9 @@ def register_message_handlers(handler):
         elif state == "awaiting_task_type":
             handle_task_type_input(user_id, text, event.reply_token)
             return
+        # ===============================================
     
+        # 只有在沒有狀態時才進行意圖分類
         intent = None
         if not state:
             intent = classify_intent_by_gemini(text)
@@ -203,6 +207,7 @@ def register_message_handlers(handler):
                 handle_show_schedule(user_id, event.reply_token)
                 return 
         
+        # 處理固定指令
         if text == "操作":
             bubble = {
                 "type": "bubble",
@@ -262,6 +267,18 @@ def register_message_handlers(handler):
                     )
                 )
             return
+
+        # 如果沒有匹配到任何處理邏輯，可以給個預設回應
+        if not state and not intent:
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[
+                            TextMessage(text="😊 您好！輸入「操作」可以查看所有功能，或直接說出您想要做的事情（例如：新增作業、查看作業等）")
+                        ]
+                    )
+                )
 
 def get_today_schedule_for_user(user_id):
     """
