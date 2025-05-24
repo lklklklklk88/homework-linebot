@@ -22,7 +22,7 @@ def get_rounded_start_time(minutes_ahead=30):
     total_minutes = now.hour * 60 + now.minute + minutes_ahead
     remainder = total_minutes % 60
     rounded_minutes = total_minutes - remainder + (30 if remainder < 30 else 60)
-    start_hour = rounded_minutes // 60
+    start_hour = (rounded_minutes // 60) % 24
     start_minute = rounded_minutes % 60
     return f"{int(start_hour):02d}:{start_minute:02d}"
 

@@ -40,9 +40,7 @@ def register_message_handlers(handler):
         data = load_data(user_id)
         state = get_user_state(user_id) 
 
-        # 使用 Gemini 判斷自然語言意圖
-        intent = classify_intent_by_gemini(text)
-
+        intent = None
         # 只有當沒有流程進行中，才進行語意判斷與快速新增
         if not state:
             intent = classify_intent_by_gemini(text)

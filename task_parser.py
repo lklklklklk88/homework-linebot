@@ -1,5 +1,5 @@
 # task_parser.py
-import json
+import json, re
 from gemini_client import call_gemini_schedule
 
 def parse_task_from_text(text: str):
@@ -17,11 +17,16 @@ def parse_task_from_text(text: str):
 
 請回傳 JSON：
 """
-
     response = call_gemini_schedule(prompt)
+    # ↘ 先直接嘗試；若失敗就抓第一個 {...}
     try:
-        data = json.loads(response)
-        return data
-    except Exception as e:
+        return json.loads(response)
+    except Exception:
+        match = re.search(r'\{.*\}', response, re.S)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception:
+                pass
         print(f"[錯誤] 解析 Gemini 回傳 JSON 失敗：{response}")
         return None

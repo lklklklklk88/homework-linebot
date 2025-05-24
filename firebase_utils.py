@@ -133,15 +133,8 @@ def get_remind_time(user_id):
         return None
     
 def save_remind_time(user_id, time_str):
-    """保存用戶的提醒時間"""
-    try:
-        ref = db.reference(f'remind_times/{user_id}')
-        ref.set(time_str)
-        print(f"已保存用戶 {user_id} 的提醒時間：{time_str}")
-        return True
-    except Exception as e:
-        print(f"保存提醒時間失敗：{e}")
-        raise e
+    db.reference(f"remind_times/{user_id}").set(time_str)
+    db.reference(f"users/{user_id}/remind_time").set(time_str)
 
 def load_metadata(user_id):
     ref = db.reference(f"users/{user_id}/meta")

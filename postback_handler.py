@@ -14,7 +14,6 @@ from linebot.v3.messaging import MessagingApi, ReplyMessageRequest
 from linebot.v3.messaging.models import TextMessage, FlexMessage, FlexContainer
 from linebot.v3.messaging import ApiClient
 from linebot.v3.messaging import Configuration
-from linebot.models import TextSendMessage, FlexSendMessage
 from flex_utils import make_schedule_carousel
 
 # 設定 logger

@@ -69,7 +69,10 @@ def remind():
             for task in tasks:
                 task["reminded"] = False
             user_data["last_reset_date"] = today_str
-            db.reference(f"users/{user_id}").set(user_data)
+            db.reference(f"users/{user_id}").update({
+                "tasks": tasks,
+                "last_reset_date": today_str
+            })
 
         try:
             remind_dt = datetime.datetime.strptime(remind_time, "%H:%M")
@@ -145,7 +148,7 @@ def remind():
                     if not task.get("done", False) and not task.get("reminded", False):
                         task["reminded"] = True
 
-                save_data(tasks, user_id)
+                save_data(user_id, tasks)
 
             except Exception as e:
                 print(f"[remind] 推送失敗給 {user_id}：{e}")
