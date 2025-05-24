@@ -53,7 +53,7 @@ def handle_task_name_input(user_id: str, text: str, reply_token: str):
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(
-                reply_token=reply_token,
+                reply_token,
                 messages=[
                     FlexMessage(alt_text="請輸入預估完成時間",
                                 contents=FlexContainer.from_dict(bubble)),
@@ -72,9 +72,11 @@ def handle_estimated_time_input(user_id: str, text: str, reply_token: str):
     except ValueError:
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[TextMessage(text="⚠️ 請輸入有效的時間，例如 2、2.5、2小時、兩小時")]
+                ReplyMessageRequest(
+                    reply_token,
+                    messages=[
+                        TextMessage(text="⚠️ 請輸入有效的時間，例如 2、2.5、2小時、兩小時")
+                    ]
                 )
             )
         return
@@ -96,7 +98,7 @@ def handle_estimated_time_input(user_id: str, text: str, reply_token: str):
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(
-                reply_token,
+                reply_token,messages=
                 [
                     FlexMessage(alt_text="請輸入作業類型",
                                 contents=FlexContainer.from_dict(bubble)),
@@ -143,7 +145,7 @@ def handle_task_type_input(user_id: str, text: str, reply_token: str):
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(
-                reply_token=reply_token,
+                reply_token,
                 messages=[
                     FlexMessage(
                         alt_text="請選擇截止日期",
@@ -152,7 +154,6 @@ def handle_task_type_input(user_id: str, text: str, reply_token: str):
                 ]
             )
         )
-
 
 def register_message_handlers(handler):
     @handler.add(MessageEvent)
