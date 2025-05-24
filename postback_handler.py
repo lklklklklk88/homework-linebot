@@ -46,20 +46,23 @@ def register_postback_handlers(handler):
         "cancel_clear_expired": handle_cancel_clear_expired,
         "clear_completed_all": handle_clear_completed_all,
         "clear_expired_all": handle_clear_expired_all,
+    }
+
+    SPECIAL_HANDLERS = {
         "select_task_due": lambda e, u, r: handle_select_task_due(e, u),
         "select_remind_time": lambda e, u, r: handle_select_remind_time(e, u, r),
         "select_add_task_remind_time": lambda e, u, r: handle_select_add_task_remind_time(e, u, r),
-        "set_task_remind": lambda d, u, r: handle_set_task_remind(u, r),
-        "set_add_task_remind": lambda d, u, r: handle_set_add_task_remind(u, r),
     }
 
     PREFIX_HANDLERS = {
         "select_task_name_": handle_select_task_name,
-        "select_time_":      handle_select_time,
-        "select_type_":      handle_select_type,
+        "select_time_": handle_select_time,
+        "select_type_": handle_select_type,
         "delete_completed_": handle_delete_completed,
-        "delete_expired_":   handle_delete_expired,
-        "mark_done_":        handle_mark_done,
+        "delete_expired_": handle_delete_expired,
+        "mark_done_": handle_mark_done,
+        "set_task_remind": handle_set_task_remind,
+        "set_add_task_remind": handle_set_add_task_remind,
         "toggle_add_task_remind": handle_toggle_add_task_remind,
     }
 
