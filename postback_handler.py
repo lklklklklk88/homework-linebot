@@ -46,6 +46,9 @@ def register_postback_handlers(handler):
         "cancel_clear_expired": handle_cancel_clear_expired,
         "clear_completed_all": handle_clear_completed_all,
         "clear_expired_all": handle_clear_expired_all,
+        "set_task_remind": handle_set_task_remind,
+        "set_add_task_remind": handle_set_add_task_remind,
+        "toggle_add_task_remind": handle_toggle_add_task_remind,
     }
 
     SPECIAL_HANDLERS = {
@@ -61,9 +64,6 @@ def register_postback_handlers(handler):
         "delete_completed_": handle_delete_completed,
         "delete_expired_": handle_delete_expired,
         "mark_done_": handle_mark_done,
-        "set_task_remind": handle_set_task_remind,
-        "set_add_task_remind": handle_set_add_task_remind,
-        "toggle_add_task_remind": handle_toggle_add_task_remind,
     }
 
     # 需要特殊處理的 postback（需要完整 event 物件）
