@@ -55,13 +55,11 @@ def register_postback_handlers(handler):
 
     PREFIX_HANDLERS = {
         "select_task_name_": handle_select_task_name,
-        "select_time_": handle_select_time,
-        "select_type_": handle_select_type,
+        "select_time_":      handle_select_time,
+        "select_type_":      handle_select_type,
         "delete_completed_": handle_delete_completed,
-        "delete_expired_": handle_delete_expired,
-        "mark_done_": handle_mark_done,
-        "set_task_remind": handle_set_task_remind,
-        "set_add_task_remind": handle_set_add_task_remind,
+        "delete_expired_":   handle_delete_expired,
+        "mark_done_":        handle_mark_done,
         "toggle_add_task_remind": handle_toggle_add_task_remind,
     }
 
