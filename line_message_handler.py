@@ -338,6 +338,67 @@ def get_weekly_progress_for_user(user_id):
         print(f"獲取週進度時發生錯誤：{str(e)}")
         return "抱歉，獲取週進度時發生錯誤，請稍後再試。"
 
+def parse_schedule_response(raw_text):
+    """
+    解析排程回應
+    """
+    print("原始回應：", raw_text)
+    
+    # 檢查是否包含排程標記
+    if "📅 今日排程" in raw_text:
+        parts = raw_text.split("📅 今日排程")
+        explanation = parts[0].strip()
+        schedule_text = "📅 今日排程" + parts[1].strip()
+        
+        # 從排程文字中提取總時數
+        total_hours_match = re.search(r'✅ 今日總時長：(\d+(?:\.\d+)?)', raw_text)
+        total_hours = float(total_hours_match.group(1)) if total_hours_match else 0
+    else:
+        # 如果沒有標記，嘗試直接解析
+        lines = raw_text.strip().split('\n')
+        schedule_lines = []
+        explanation_lines = []
+        
+        for line in lines:
+            if re.match(r'\d+\.\s*[^\s]+', line):
+                schedule_lines.append(line)
+            else:
+                explanation_lines.append(line)
+        
+        explanation = '\n'.join(explanation_lines).strip()
+        schedule_text = '\n'.join(schedule_lines).strip()
+        
+        # 計算總時數
+        blocks = extract_schedule_blocks(schedule_text)
+        total_hours = sum(float(block['duration'].replace('分鐘', '')) / 60 for block in blocks)
+
+    return explanation, schedule_text, total_hours
+
+def get_weekly_progress(user_id):
+    """
+    計算並回傳使用者的週進度
+    """
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+    start_of_week = now - datetime.timedelta(days=now.weekday())
+    end_of_week = start_of_week + datetime.timedelta(days=6)
+    
+    tasks = load_data(user_id)
+    completed_tasks = 0
+    total_hours = 0
+    
+    for task in tasks:
+        if task.get("done", False):
+            completed_tasks += 1
+            total_hours += task.get("estimated_time", 0)
+    
+    avg_hours_per_day = total_hours / 7 if completed_tasks > 0 else 0
+
+    return {
+        "completed_tasks": completed_tasks,
+        "total_hours": total_hours,
+        "avg_hours_per_day": avg_hours_per_day
+    }
+
 def _parse_hours(raw: str) -> float:
     # 將全形數字轉半形
     trans = str.maketrans("０１２３４５６７８９．", "0123456789.")
@@ -375,51 +436,3 @@ def _parse_hours(raw: str) -> float:
 
     # 仍然失敗就拋例外
     raise ValueError(f"無法解析時間：{raw}")
-
-def get_weekly_progress(user_id):
-    """
-    計算並回傳使用者的週進度
-    """
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-    start_of_week = now - datetime.timedelta(days=now.weekday())
-    end_of_week = start_of_week + datetime.timedelta(days=6)
-    
-    tasks = load_data(user_id)
-    completed_tasks = 0
-    total_hours = 0
-    
-    for task in tasks:
-        if task.get("done", False):
-            completed_tasks += 1
-            total_hours += task.get("estimated_time", 0)
-    
-    avg_hours_per_day = total_hours / 7 if completed_tasks > 0 else 0
-
-    return {
-        "completed_tasks": completed_tasks,
-        "total_hours": total_hours,
-        "avg_hours_per_day": avg_hours_per_day
-    }
-
-def _parse_hours(raw: str) -> float:
-    # 將全形數字轉半形
-    trans = str.maketrans("０１２３４５６７８９．", "0123456789.")
-    raw = raw.translate(trans)
-
-    # 先找阿拉伯數字
-    m = re.search(r"(\d+(?:\.\d+)?)", raw)
-    if m:
-        return float(m.group(1))
-
-    # 再嘗試最常見的中文數字（簡單對映，足夠日常輸入）
-    zh_map = {"零":0,"一":1,"二":2,"兩":2,"三":3,"四":4,"五":5,
-              "六":6,"七":7,"八":8,"九":9,"十":10,"半":0.5}
-    total = 0
-    for ch in raw:
-        if ch in zh_map:
-            total += zh_map[ch]
-    if total:
-        return float(total)
-
-    # 仍然失敗就拋例外，交給呼叫端回覆錯誤訊息
-    raise ValueError("cannot parse hours")
