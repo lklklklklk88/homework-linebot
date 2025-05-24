@@ -16,6 +16,307 @@ EMOJI_MAP = {
     'meeting': '👥'
 }
 
+def make_enhanced_time_bubble(time_history: List[str], user_id: str) -> Dict[str, Any]:
+    """
+    增強版時間選擇泡泡，包含快速選項和智慧建議
+    """
+    # 分析歷史記錄，找出最常用的時間
+    from collections import Counter
+    time_counter = Counter(time_history)
+    most_common_time = time_counter.most_common(1)[0][0] if time_counter else "2小時"
+    
+    # 快速時間選項
+    quick_times = ["0.5小時", "1小時", "1.5小時", "2小時", "3小時"]
+    quick_buttons = []
+    
+    for time in quick_times:
+        color = "#10B981" if time == most_common_time else "#6B7280"
+        quick_buttons.append({
+            "type": "button",
+            "action": {
+                "type": "postback",
+                "label": f"⏱️ {time}",
+                "data": f"select_time_{time.replace('小時', '')}"
+            },
+            "style": "secondary",
+            "color": color
+        })
+    
+    # 歷史記錄按鈕（去重）
+    unique_history = list(dict.fromkeys(time_history[-5:]))  # 保留最近5個不重複的
+    history_buttons = []
+    
+    for time in unique_history[:3]:
+        if time not in quick_times:  # 避免重複
+            history_buttons.append({
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": f"📊 {time}",
+                    "data": f"select_time_{time.replace('小時', '')}"
+                },
+                "style": "secondary"
+            })
+    
+    bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "⏰ 預估完成時間",
+                    "color": "#FFFFFF",
+                    "size": "lg",
+                    "weight": "bold"
+                }
+            ],
+            "backgroundColor": "#EC4899",
+            "paddingAll": "15px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "請選擇或輸入預估時間",
+                    "size": "md",
+                    "weight": "bold",
+                    "color": "#1F2937"
+                },
+                {
+                    "type": "text",
+                    "text": f"💡 根據您的習慣，建議：{most_common_time}",
+                    "size": "sm",
+                    "color": "#059669",
+                    "wrap": True,
+                    "margin": "sm"
+                },
+                {
+                    "type": "separator",
+                    "margin": "lg"
+                },
+                {
+                    "type": "text",
+                    "text": "⚡ 快速選擇",
+                    "size": "sm",
+                    "weight": "bold",
+                    "color": "#4B5563"
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "spacing": "sm",
+                    "margin": "sm",
+                    "contents": quick_buttons[:3]  # 第一行顯示3個
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "spacing": "sm",
+                    "margin": "sm",
+                    "contents": quick_buttons[3:]  # 第二行顯示剩餘的
+                }
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "❌ 取消",
+                        "data": "cancel_add_task"
+                    },
+                    "style": "secondary"
+                }
+            ]
+        }
+    }
+    
+    # 如果有不同的歷史記錄，加入
+    if history_buttons:
+        bubble["body"]["contents"].extend([
+            {
+                "type": "separator",
+                "margin": "lg"
+            },
+            {
+                "type": "text",
+                "text": "📋 其他常用時間",
+                "size": "sm",
+                "weight": "bold",
+                "color": "#4B5563",
+                "margin": "md"
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "margin": "sm",
+                "contents": history_buttons
+            }
+        ])
+    
+    return bubble
+
+def make_enhanced_type_bubble(type_history: List[str]) -> Dict[str, Any]:
+    """
+    增強版作業類型選擇泡泡
+    """
+    # 定義常見類型及其圖示和顏色
+    type_config = {
+        "閱讀": {"icon": "📖", "color": "#3B82F6"},
+        "寫作": {"icon": "✍️", "color": "#8B5CF6"},
+        "程式": {"icon": "💻", "color": "#10B981"},
+        "計算": {"icon": "🧮", "color": "#F59E0B"},
+        "報告": {"icon": "📊", "color": "#EF4444"},
+        "研究": {"icon": "🔬", "color": "#06B6D4"},
+        "練習": {"icon": "📝", "color": "#EC4899"},
+        "其他": {"icon": "📋", "color": "#6B7280"}
+    }
+    
+    # 常用類型按鈕
+    common_types = ["閱讀", "寫作", "程式", "計算", "報告", "練習"]
+    type_buttons = []
+    
+    for type_name in common_types:
+        config = type_config.get(type_name, type_config["其他"])
+        type_buttons.append({
+            "type": "button",
+            "action": {
+                "type": "postback",
+                "label": f"{config['icon']} {type_name}",
+                "data": f"select_type_{type_name}"
+            },
+            "style": "secondary",
+            "color": config["color"]
+        })
+    
+    # 歷史記錄按鈕
+    history_buttons = []
+    unique_history = list(dict.fromkeys(type_history[-5:]))
+    
+    for type_name in unique_history[:3]:
+        if type_name not in common_types:
+            config = type_config.get(type_name, type_config["其他"])
+            history_buttons.append({
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": f"{config['icon']} {type_name}",
+                    "data": f"select_type_{type_name}"
+                },
+                "style": "secondary"
+            })
+    
+    bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "📚 作業類型",
+                    "color": "#FFFFFF",
+                    "size": "lg",
+                    "weight": "bold"
+                }
+            ],
+            "backgroundColor": "#7C3AED",
+            "paddingAll": "15px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "請選擇作業類型",
+                    "size": "md",
+                    "weight": "bold",
+                    "color": "#1F2937"
+                },
+                {
+                    "type": "text",
+                    "text": "這有助於安排您的學習時間",
+                    "size": "sm",
+                    "color": "#6B7280",
+                    "wrap": True
+                },
+                {
+                    "type": "separator",
+                    "margin": "lg"
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "spacing": "sm",
+                    "contents": type_buttons[:3]
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "spacing": "sm",
+                    "margin": "sm",
+                    "contents": type_buttons[3:6]
+                }
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "❌ 取消",
+                        "data": "cancel_add_task"
+                    },
+                    "style": "secondary"
+                }
+            ]
+        }
+    }
+    
+    # 加入歷史記錄
+    if history_buttons:
+        bubble["body"]["contents"].extend([
+            {
+                "type": "separator",
+                "margin": "lg"
+            },
+            {
+                "type": "text",
+                "text": "📋 最近使用",
+                "size": "sm",
+                "weight": "bold",
+                "color": "#4B5563",
+                "margin": "md"
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "margin": "sm",
+                "contents": history_buttons
+            }
+        ])
+    
+    return bubble
+
 def calculate_duration(start, end):
     """
     計算時間區間的持續時間（分鐘）

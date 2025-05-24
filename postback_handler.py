@@ -64,6 +64,8 @@ def register_postback_handlers(handler):
         "delete_completed_": handle_delete_completed,
         "delete_expired_": handle_delete_expired,
         "mark_done_": handle_mark_done,
+        "quick_task_": handle_quick_task,
+        "quick_due_": handle_quick_due,
     }
 
     # 需要特殊處理的 postback（需要完整 event 物件）
@@ -125,49 +127,145 @@ def handle_add_task(user_id, reply_token):
     clear_temp_task(user_id)
     name_history, _, _ = get_task_history(user_id)
 
-    buttons = []
-    # 限制只顯示最近3個歷史記錄
+    # 建立快速選項按鈕
+    quick_buttons = []
+    
+    # 常用作業類型快速按鈕
+    common_tasks = ["數學作業", "英文作業", "國文作業", "程式作業"]
+    for task in common_tasks:
+        if task not in name_history:  # 避免重複
+            quick_buttons.append({
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": f"📚 {task}",
+                    "data": f"quick_task_{task}"
+                },
+                "style": "secondary",
+                "color": "#5C6BC0"
+            })
+    
+    # 歷史記錄按鈕
+    history_buttons = []
     for name in name_history[-3:]:
-        buttons.append({
+        history_buttons.append({
             "type": "button",
             "action": {
                 "type": "postback",
-                "label": name,
+                "label": f"📝 {name}",
                 "data": f"select_task_name_{name}"
             },
             "style": "secondary"
         })
 
-    buttons.append({
-        "type": "button",
-        "action": {
-            "type": "postback",
-            "label": "❌ 取消",
-            "data": "cancel_add_task"
-        },
-        "style": "secondary"
-    })
-
     bubble = {
         "type": "bubble",
+        "size": "mega",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "✨ 新增作業",
+                    "color": "#FFFFFF",
+                    "size": "xl",
+                    "weight": "bold"
+                }
+            ],
+            "backgroundColor": "#6366F1",
+            "paddingAll": "20px"
+        },
         "body": {
             "type": "box",
             "layout": "vertical",
-            "spacing": "md",
+            "spacing": "lg",
             "contents": [
-                {"type": "text", "text": "📝 請輸入作業名稱", "weight": "bold", "size": "lg"},
-                {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
-                *buttons
+                {
+                    "type": "text",
+                    "text": "請輸入作業名稱",
+                    "size": "md",
+                    "weight": "bold",
+                    "color": "#1F2937"
+                },
+                {
+                    "type": "text",
+                    "text": "或從下方選擇：",
+                    "size": "sm",
+                    "color": "#6B7280",
+                    "margin": "sm"
+                }
             ]
         }
+    }
+    
+    # 如果有快速選項，加入快速選項區塊
+    if quick_buttons:
+        bubble["body"]["contents"].append({
+            "type": "separator",
+            "margin": "lg"
+        })
+        bubble["body"]["contents"].append({
+            "type": "text",
+            "text": "🚀 快速選擇",
+            "size": "sm",
+            "weight": "bold",
+            "color": "#4B5563",
+            "margin": "lg"
+        })
+        bubble["body"]["contents"].append({
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "margin": "sm",
+            "contents": quick_buttons[:2]  # 顯示前2個
+        })
+    
+    # 如果有歷史記錄，加入歷史記錄區塊
+    if history_buttons:
+        bubble["body"]["contents"].append({
+            "type": "separator",
+            "margin": "lg"
+        })
+        bubble["body"]["contents"].append({
+            "type": "text",
+            "text": "📋 最近使用",
+            "size": "sm",
+            "weight": "bold",
+            "color": "#4B5563",
+            "margin": "lg"
+        })
+        bubble["body"]["contents"].append({
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "margin": "sm",
+            "contents": history_buttons
+        })
+    
+    # Footer 加入取消按鈕
+    bubble["footer"] = {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": "❌ 取消",
+                    "data": "cancel_add_task"
+                },
+                "style": "secondary"
+            }
+        ]
     }
 
     messages = [
         FlexMessage(
-            alt_text="請輸入作業名稱",
+            alt_text="新增作業",
             contents=FlexContainer.from_dict(bubble)
         ),
-        TextMessage(text="請輸入作業名稱：")
+        TextMessage(text="💡 提示：直接輸入作業名稱，或點選上方按鈕")
     ]
 
     with ApiClient(configuration) as api_client:
@@ -279,37 +377,129 @@ def handle_select_type(data, user_id, reply_token):
     set_temp_task(user_id, temp_task)
     set_user_state(user_id, "awaiting_task_due")
 
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+    today = now.strftime("%Y-%m-%d")
+    tomorrow = (now + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    next_week = (now + datetime.timedelta(days=7)).strftime("%Y-%m-%d")
 
     bubble = {
         "type": "bubble",
+        "size": "mega",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "📅 截止日期",
+                    "color": "#FFFFFF",
+                    "size": "lg",
+                    "weight": "bold"
+                }
+            ],
+            "backgroundColor": "#F97316",
+            "paddingAll": "15px"
+        },
         "body": {
             "type": "box",
             "layout": "vertical",
             "spacing": "md",
             "contents": [
-                {"type": "text", "text": "📅 請選擇截止日期", "weight": "bold", "size": "md"},
+                {
+                    "type": "text",
+                    "text": "請選擇截止日期",
+                    "size": "md",
+                    "weight": "bold",
+                    "color": "#1F2937"
+                },
+                {
+                    "type": "separator",
+                    "margin": "lg"
+                },
+                {
+                    "type": "text",
+                    "text": "⚡ 快速選擇",
+                    "size": "sm",
+                    "weight": "bold",
+                    "color": "#4B5563"
+                },
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "sm",
+                    "margin": "sm",
+                    "contents": [
+                        {
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": "📌 今天",
+                                "data": f"quick_due_{today}"
+                            },
+                            "style": "secondary",
+                            "color": "#DC2626"
+                        },
+                        {
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": "📍 明天",
+                                "data": f"quick_due_{tomorrow}"
+                            },
+                            "style": "secondary",
+                            "color": "#F59E0B"
+                        },
+                        {
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": "📎 一週後",
+                                "data": f"quick_due_{next_week}"
+                            },
+                            "style": "secondary",
+                            "color": "#3B82F6"
+                        }
+                    ]
+                },
+                {
+                    "type": "separator",
+                    "margin": "lg"
+                },
                 {
                     "type": "button",
                     "action": {
                         "type": "datetimepicker",
-                        "label": "📅 選擇日期",
+                        "label": "📅 選擇其他日期",
                         "data": "select_task_due",
                         "mode": "date",
-                        "initial": now,
+                        "initial": today,
                         "max": "2099-12-31",
-                        "min": now
+                        "min": today
                     },
                     "style": "primary"
                 },
                 {
                     "type": "button",
-                    "action": {"type": "postback", "label": "❌ 不設定截止日期", "data": "no_due_date"},
+                    "action": {
+                        "type": "postback",
+                        "label": "🚫 不設定截止日期",
+                        "data": "no_due_date"
+                    },
                     "style": "secondary"
-                },
+                }
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
                 {
                     "type": "button",
-                    "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_add_task"},
+                    "action": {
+                        "type": "postback",
+                        "label": "❌ 取消",
+                        "data": "cancel_add_task"
+                    },
                     "style": "secondary"
                 }
             ]
@@ -319,7 +509,7 @@ def handle_select_type(data, user_id, reply_token):
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(reply_token=reply_token, messages=[
-                FlexMessage(alt_text="請選擇截止日期", contents=FlexContainer.from_dict(bubble))
+                FlexMessage(alt_text="選擇截止日期", contents=FlexContainer.from_dict(bubble))
             ])
         )
 
@@ -468,6 +658,125 @@ def handle_confirm_add_task(user_id, reply_token):
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
+        )
+
+def handle_quick_task(data, user_id, reply_token):
+    """處理快速選擇作業名稱"""
+    task_name = data.replace("quick_task_", "")
+    temp_task = {"task": task_name}
+    set_temp_task(user_id, temp_task)
+    set_user_state(user_id, "awaiting_task_time")
+    
+    # 使用增強版時間選擇介面
+    _, _, time_history = get_task_history(user_id)
+    from flex_utils import make_enhanced_time_bubble
+    bubble = make_enhanced_time_bubble(time_history, user_id)
+    
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[
+                    FlexMessage(alt_text="選擇預估時間", contents=FlexContainer.from_dict(bubble))
+                ]
+            )
+        )
+
+def handle_quick_due(data, user_id, reply_token):
+    """處理快速選擇截止日期"""
+    due_date = data.replace("quick_due_", "")
+    temp_task = get_temp_task(user_id)
+    temp_task["due"] = due_date
+    set_temp_task(user_id, temp_task)
+    
+    # 直接顯示確認畫面
+    reply_bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "✅ 確認新增作業",
+                    "color": "#FFFFFF",
+                    "size": "lg",
+                    "weight": "bold"
+                }
+            ],
+            "backgroundColor": "#10B981",
+            "paddingAll": "15px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": [
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "contents": [
+                        {"type": "text", "text": "📝", "flex": 0},
+                        {"type": "text", "text": "作業名稱", "flex": 2, "color": "#6B7280"},
+                        {"type": "text", "text": temp_task.get('task', '未設定'), "flex": 3, "weight": "bold"}
+                    ]
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "contents": [
+                        {"type": "text", "text": "⏰", "flex": 0},
+                        {"type": "text", "text": "預估時間", "flex": 2, "color": "#6B7280"},
+                        {"type": "text", "text": f"{temp_task.get('estimated_time', 0)} 小時", "flex": 3, "weight": "bold"}
+                    ]
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "contents": [
+                        {"type": "text", "text": "📚", "flex": 0},
+                        {"type": "text", "text": "作業類型", "flex": 2, "color": "#6B7280"},
+                        {"type": "text", "text": temp_task.get('category', '未設定'), "flex": 3, "weight": "bold"}
+                    ]
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "contents": [
+                        {"type": "text", "text": "📅", "flex": 0},
+                        {"type": "text", "text": "截止日期", "flex": 2, "color": "#6B7280"},
+                        {"type": "text", "text": temp_task.get('due', '未設定'), "flex": 3, "weight": "bold"}
+                    ]
+                }
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "horizontal",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "action": {"type": "postback", "label": "✅ 確認新增", "data": "confirm_add_task"},
+                    "style": "primary",
+                    "color": "#10B981"
+                },
+                {
+                    "type": "button",
+                    "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_add_task"},
+                    "style": "secondary"
+                }
+            ]
+        }
+    }
+    
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[FlexMessage(alt_text="確認新增作業", contents=FlexContainer.from_dict(reply_bubble))]
+            )
         )
 
 def handle_cancel_add_task(user_id, reply_token):

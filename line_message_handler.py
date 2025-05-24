@@ -64,9 +64,7 @@ def handle_task_name_input(user_id: str, text: str, reply_token: str):
 
 # === ➋ 處理「手寫預估時間」 ================================
 def handle_estimated_time_input(user_id: str, text: str, reply_token: str):
-    """
-    使用者輸入預估時間 → 更新 temp_task → 切換 state → 推送「請輸入作業類型」卡片
-    """
+    """使用者輸入預估時間"""
     try:
         hours = _parse_hours(text.strip())
     except ValueError:
@@ -86,27 +84,22 @@ def handle_estimated_time_input(user_id: str, text: str, reply_token: str):
     set_temp_task(user_id, temp_task)
     set_user_state(user_id, "awaiting_task_type")
 
-    name_history, type_history, _ = get_task_history(user_id)
-    buttons = [{
-        "type": "button",
-        "action": {"type": "postback", "label": t, "data": f"select_type_{t}"},
-        "style": "secondary"
-    } for t in type_history[-3:]]
-
-    bubble = make_type_history_bubble(type_history)
+    # 使用增強版類型選擇介面
+    _, type_history, _ = get_task_history(user_id)
+    from flex_utils import make_enhanced_type_bubble
+    bubble = make_enhanced_type_bubble(type_history)
 
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(
                 reply_token=reply_token,
                 messages=[
-                    FlexMessage(alt_text="請輸入作業類型",
-                                contents=FlexContainer.from_dict(bubble)),
-                    TextMessage(text="請輸入作業類型：")
+                    FlexMessage(alt_text="選擇作業類型",
+                                contents=FlexContainer.from_dict(bubble))
                 ]
             )
         )
-
+        
 # === ➌ 處理「手寫作業類型」 ================================
 def handle_task_type_input(user_id: str, text: str, reply_token: str):
     """
