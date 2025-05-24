@@ -99,7 +99,7 @@ def handle_estimated_time_input(user_id: str, text: str, reply_token: str):
                 ]
             )
         )
-        
+
 # === ➌ 處理「手寫作業類型」 ================================
 def handle_task_type_input(user_id: str, text: str, reply_token: str):
     """

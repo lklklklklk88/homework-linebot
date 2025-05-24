@@ -126,24 +126,6 @@ def handle_add_task(user_id, reply_token):
     set_user_state(user_id, "awaiting_task_name")
     clear_temp_task(user_id)
     name_history, _, _ = get_task_history(user_id)
-
-    # 建立快速選項按鈕
-    quick_buttons = []
-    
-    # 常用作業類型快速按鈕
-    common_tasks = ["數學作業", "英文作業", "國文作業", "程式作業"]
-    for task in common_tasks:
-        if task not in name_history:  # 避免重複
-            quick_buttons.append({
-                "type": "button",
-                "action": {
-                    "type": "postback",
-                    "label": f"📚 {task}",
-                    "data": f"quick_task_{task}"
-                },
-                "style": "secondary",
-                "color": "#5C6BC0"
-            })
     
     # 歷史記錄按鈕
     history_buttons = []
@@ -187,42 +169,20 @@ def handle_add_task(user_id, reply_token):
                     "size": "md",
                     "weight": "bold",
                     "color": "#1F2937"
-                },
-                {
-                    "type": "text",
-                    "text": "或從下方選擇：",
-                    "size": "sm",
-                    "color": "#6B7280",
-                    "margin": "sm"
                 }
             ]
         }
     }
     
-    # 如果有快速選項，加入快速選項區塊
-    if quick_buttons:
-        bubble["body"]["contents"].append({
-            "type": "separator",
-            "margin": "lg"
-        })
-        bubble["body"]["contents"].append({
-            "type": "text",
-            "text": "🚀 快速選擇",
-            "size": "sm",
-            "weight": "bold",
-            "color": "#4B5563",
-            "margin": "lg"
-        })
-        bubble["body"]["contents"].append({
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "sm",
-            "margin": "sm",
-            "contents": quick_buttons[:2]  # 顯示前2個
-        })
-    
     # 如果有歷史記錄，加入歷史記錄區塊
     if history_buttons:
+        bubble["body"]["contents"].append({
+            "type": "text",
+            "text": "或從最近使用中選擇：",
+            "size": "sm",
+            "color": "#6B7280",
+            "margin": "sm"
+        })
         bubble["body"]["contents"].append({
             "type": "separator",
             "margin": "lg"
