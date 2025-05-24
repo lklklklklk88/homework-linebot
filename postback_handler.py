@@ -16,12 +16,49 @@ from linebot.v3.messaging import ApiClient
 from linebot.v3.messaging import Configuration
 from flex_utils import make_schedule_carousel
 
+
 # 設定 logger
 logger = logging.getLogger(__name__)
 
 configuration = Configuration(access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
 
 def register_postback_handlers(handler):
+    # 定義所有的處理器映射
+    POSTBACK_HANDLERS = {
+        "add_task": handle_add_task,
+        "show_schedule": handle_show_schedule,
+        "view_tasks": handle_view_tasks,
+        "complete_task": handle_complete_task_direct,
+        "set_remind_time": handle_set_remind_time,
+        "clear_completed": handle_clear_completed,
+        "clear_expired": handle_clear_expired,
+        "cancel_add_task": handle_cancel_add_task,
+        "confirm_add_task": handle_confirm_add_task,
+        "no_due_date": handle_no_due_date,
+        "cancel_set_remind": handle_cancel_set_remind,
+        "clear_completed_select": handle_clear_completed_select,
+        "clear_expired_select": handle_clear_expired_select,
+        "cancel_clear_completed": handle_cancel_clear_completed,
+        "cancel_clear_expired": handle_cancel_clear_expired,
+        "clear_completed_all": handle_clear_completed_all,
+        "clear_expired_all": handle_clear_expired_all,
+    }
+
+    PREFIX_HANDLERS = {
+        "select_task_name_": handle_select_task_name,
+        "select_time_": handle_select_time,
+        "select_type_": handle_select_type,
+        "delete_completed_": handle_delete_completed,
+        "delete_expired_": handle_delete_expired,
+        "mark_done_": handle_mark_done,
+    }
+
+    # 需要特殊處理的 postback（需要完整 event 物件）
+    SPECIAL_HANDLERS = {
+        "select_task_due": lambda e, u, r: handle_select_task_due(e, u),
+        "select_remind_time": lambda e, u, r: handle_select_remind_time(e, u, r),
+    }
+
     @handler.add(PostbackEvent)
     def handle_postback(event):
         try:
@@ -29,132 +66,39 @@ def register_postback_handlers(handler):
             user_id = event.source.user_id
             reply_token = event.reply_token
             
-            print(f"收到 postback 事件：{data}")  # 新增日誌
-
-            if data == "add_task":
-                handle_add_task(user_id, reply_token)
+            print(f"收到 postback 事件：{data}")
+            
+            # 1. 先檢查是否為特殊處理
+            if data in SPECIAL_HANDLERS:
+                SPECIAL_HANDLERS[data](event, user_id, reply_token)
                 return
             
-            elif data.startswith("select_task_name_"):
-                handle_select_task_name(data, user_id, reply_token)
-                return
-
-            elif data.startswith("select_time_"):
-                handle_select_time(data, user_id, reply_token)
-                return
-
-            elif data.startswith("select_type_"):
-                handle_select_type(data, user_id, reply_token)
-                return
-
-            elif data == "cancel_add_task":
-                handle_cancel_add_task(user_id, reply_token)
-                return
-
-            elif data == "confirm_add_task":
-                handle_confirm_add_task(user_id, reply_token)
-                return
-
-            elif data == "show_schedule":
-                handle_show_schedule(user_id, reply_token)
-                return
-
-            elif data == "view_tasks":
-                handle_view_tasks(user_id, reply_token)
-                return
+            # 2. 檢查是否為帶前綴的 postback
+            for prefix, handler_func in PREFIX_HANDLERS.items():
+                if data.startswith(prefix):
+                    handler_func(data, user_id, reply_token)
+                    return
             
-            elif data == "complete_task":
-                handle_complete_task_direct(user_id, reply_token)
+            # 3. 檢查是否為固定的 postback
+            if data in POSTBACK_HANDLERS:
+                POSTBACK_HANDLERS[data](user_id, reply_token)
                 return
-
-            elif data == "select_task_due":
-                handle_select_task_due(event, user_id)
-                return
-
-            elif data == "no_due_date":
-                handle_no_due_date(user_id, reply_token)
-                return
-
-            elif data == "set_remind_time":
-                handle_set_remind_time(user_id, reply_token)
-                return
-
-            elif data == "clear_completed":
-                handle_clear_completed(user_id, reply_token)
-                return
-
-            elif data == "clear_expired":
-                handle_clear_expired(user_id, reply_token)
-                return
-            
-            elif data == "select_remind_time":
-                handle_select_remind_time(event, user_id, reply_token)
-                return
-            
-            elif data == "cancel_set_remind":
-                handle_cancel_set_remind(user_id, reply_token)
-                return
-
-            elif data == "clear_completed_select":
-                handle_clear_completed_select(user_id, reply_token)
-                return
-
-            elif data.startswith("delete_completed_"):
-                handle_delete_completed(data, user_id, reply_token)
-                return
-            
-            elif data == "clear_expired_select":
-                handle_clear_expired_select(user_id, reply_token)
-                return
-
-            elif data.startswith("delete_expired_"):
-                handle_delete_expired(data, user_id, reply_token)
-                return
-
-            elif data == "cancel_clear_completed":
-                handle_cancel_clear_completed(user_id, reply_token)
-                return
-
-            elif data == "cancel_clear_expired":
-                handle_cancel_clear_expired(user_id, reply_token)
-                return
-            
-            elif data == "clear_completed_all":
-                handle_clear_completed_all(user_id, reply_token)
-                return
-
-            elif data == "clear_expired_all":
-                handle_clear_expired_all(user_id, reply_token)
-                return
-
-
-            elif data.startswith("mark_done_"):
-                try:
-                    task_index = int(data.replace("mark_done_", ""))
-                    tasks = load_data(user_id)
-
-                    if 0 <= task_index < len(tasks):
-                        tasks[task_index]["done"] = True
-                        save_data(user_id, tasks)
-                        reply = f"✅ 已完成作業：{tasks[task_index]['task']}"
-                    else:
-                        reply = "❌ 找不到該作業"
-
-                except Exception as e:
-                    print(f"完成作業失敗：{str(e)}")
-                    reply = "❌ 發生錯誤，請稍後再試"
-
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(
-                        ReplyMessageRequest(
-                            reply_token=reply_token,
-                            messages=[TextMessage(text=reply)]
-                        )
+                
+            # 4. 未知的 postback
+            print(f"警告：未知的 postback data: {data}")
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=reply_token,
+                        messages=[TextMessage(text="❌ 無法處理此操作")]
                     )
-                return
-
+                )
+            
         except Exception as e:
             print(f"處理 postback 事件時發生錯誤：{str(e)}")
+            import traceback
+            traceback.print_exc()
+            
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
                     ReplyMessageRequest(
@@ -812,6 +756,40 @@ def handle_complete_task_direct(user_id, reply_token):
                     alt_text="選擇要完成的作業",
                     contents=FlexContainer.from_dict(bubble)
                 )]
+            )
+        )
+
+def handle_mark_done(data, user_id, reply_token):
+    """
+    處理標記作業為完成的 postback
+    data 格式：mark_done_0, mark_done_1 等
+    """
+    try:
+        # 從 data 中提取作業索引
+        task_index = int(data.replace("mark_done_", ""))
+        tasks = load_data(user_id)
+
+        if 0 <= task_index < len(tasks):
+            # 標記為完成
+            tasks[task_index]["done"] = True
+            save_data(user_id, tasks)
+            reply = f"✅ 已完成作業：{tasks[task_index]['task']}"
+        else:
+            reply = "❌ 找不到該作業"
+
+    except ValueError:
+        print(f"無效的作業索引：{data}")
+        reply = "❌ 無效的作業編號"
+    except Exception as e:
+        print(f"完成作業失敗：{str(e)}")
+        reply = "❌ 發生錯誤，請稍後再試"
+
+    # 回覆訊息
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[TextMessage(text=reply)]
             )
         )
 

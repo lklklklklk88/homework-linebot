@@ -53,105 +53,131 @@ def callback():
 
 @app.route("/remind", methods=["GET"])
 def remind():
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))  # 台灣時區
-    current_time_str = now.strftime("%H:%M")
+    try:
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+        current_time_str = now.strftime("%H:%M")
 
-    users = db.reference("users").get()
-    for user_id, user_data in users.items():
-        tasks = user_data.get("tasks", [])
-        remind_time = user_data.get("remind_time", "08:00")
-
-        # 每天只重置一次提醒狀態
-        last_reset_date = user_data.get("last_reset_date")
-        today_str = now.strftime("%Y-%m-%d")
-
-        if last_reset_date != today_str:
-            for task in tasks:
-                task["reminded"] = False
-            user_data["last_reset_date"] = today_str
-            db.reference(f"users/{user_id}").update({
-                "tasks": tasks,
-                "last_reset_date": today_str
-            })
-
-        try:
-            remind_dt = datetime.datetime.strptime(remind_time, "%H:%M")
-            remind_datetime = now.replace(hour=remind_dt.hour, minute=remind_dt.minute, second=0, microsecond=0)
-
-            time_diff = (now - remind_datetime).total_seconds()
-            if time_diff < 0 or time_diff > 600:
-                continue
-
-        except Exception as e:
-            print(f"[remind] 使用者 {user_id} 的提醒時間格式錯誤：{remind_time}")
-            continue
-
-        rows = []
-        has_task = False
-        for i, task in enumerate(tasks):
-            if not task.get("done", False) and not task.get("reminded", False):
-                has_task = True
-                due = task.get("due", "未設定")
-                label = ""
-
-                if due != "未設定":
-                    try:
-                        due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
-                        if due_date == now.date():
-                            label = "\n(🔥今天到期)"
-                        elif due_date == now.date() + datetime.timedelta(days=1):
-                            label = "\n(⚠️明天到期)"
-                    except:
-                        pass
-
-                rows.append({
-                    "type": "box",
-                    "layout": "horizontal",
-                    "contents": [
-                        {"type": "text", "text": f"{i+1}.", "size": "sm", "flex": 1},
-                        {"type": "text", "text": f"🔲 {task['task']}", "size": "sm", "flex": 6, "wrap": True, "maxLines": 3},
-                        {"type": "text", "text": f"{due}{label}", "size": "sm", "flex": 5, "wrap": True}
-                    ]
-                })
-
-        if has_task:
-            display_name = get_line_display_name(user_id)
-
-            bubble = {
-                "type": "bubble",
-                "body": {
-                    
-                    "type": "box",
-                    "layout": "vertical",
-                    "spacing": "sm",
-                    "contents": [
-                        {"type": "text", "text": f"👤 {display_name}，以下是你尚未完成的作業：", "weight": "bold", "size": "md"},
-                        {"type": "separator"},
-                        *rows
-                    ]
-                }
-            }
-
+        users = db.reference("users").get()
+        if not users:
+            return "OK - No users"
+        
+        processed_count = 0
+        MAX_USERS_PER_RUN = 50
+        
+        for user_id, user_data in users.items():
+            if processed_count >= MAX_USERS_PER_RUN:
+                break
+                
             try:
-                line_bot_api.push_message(
-                    PushMessageRequest(
-                        to=user_id,
-                        messages=[FlexMessage(
-                            alt_text="提醒作業清單",
-                            contents=FlexContainer.from_dict(bubble)
-                        )]
-                    )
-                )
-                print(f"[remind] 已推送提醒給 {user_id}")
+                if not isinstance(user_data, dict):
+                    continue
+                    
+                tasks = user_data.get("tasks", [])
+                remind_time = user_data.get("remind_time", "08:00")
+                
+                # 每天只重置一次提醒狀態
+                last_reset_date = user_data.get("last_reset_date")
+                today_str = now.strftime("%Y-%m-%d")
 
-                for task in tasks:
+                if last_reset_date != today_str:
+                    for task in tasks:
+                        task["reminded"] = False
+                    user_data["last_reset_date"] = today_str
+                    db.reference(f"users/{user_id}").update({
+                        "tasks": tasks,
+                        "last_reset_date": today_str
+                    })
+
+                # 檢查是否到提醒時間
+                try:
+                    remind_dt = datetime.datetime.strptime(remind_time, "%H:%M")
+                    remind_datetime = now.replace(hour=remind_dt.hour, minute=remind_dt.minute, second=0, microsecond=0)
+
+                    time_diff = (now - remind_datetime).total_seconds()
+                    if time_diff < 0 or time_diff > 600:  # 10分鐘內
+                        continue
+
+                except Exception as e:
+                    print(f"[remind] 使用者 {user_id} 的提醒時間格式錯誤：{remind_time}")
+                    continue
+
+                # 建立提醒內容
+                rows = []
+                has_task = False
+                for i, task in enumerate(tasks):
                     if not task.get("done", False) and not task.get("reminded", False):
-                        task["reminded"] = True
+                        has_task = True
+                        due = task.get("due", "未設定")
+                        label = ""
 
-                save_data(user_id, tasks)
+                        if due != "未設定":
+                            try:
+                                due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
+                                if due_date == now.date():
+                                    label = "\n(🔥今天到期)"
+                                elif due_date == now.date() + datetime.timedelta(days=1):
+                                    label = "\n(⚠️明天到期)"
+                            except:
+                                pass
 
+                        rows.append({
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {"type": "text", "text": f"{i+1}.", "size": "sm", "flex": 1},
+                                {"type": "text", "text": f"🔲 {task['task']}", "size": "sm", "flex": 6, "wrap": True, "maxLines": 3},
+                                {"type": "text", "text": f"{due}{label}", "size": "sm", "flex": 5, "wrap": True}
+                            ]
+                        })
+
+                if has_task:
+                    display_name = get_line_display_name(user_id)
+
+                    bubble = {
+                        "type": "bubble",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "spacing": "sm",
+                            "contents": [
+                                {"type": "text", "text": f"👤 {display_name}，以下是你尚未完成的作業：", "weight": "bold", "size": "md"},
+                                {"type": "separator"},
+                                *rows
+                            ]
+                        }
+                    }
+
+                    try:
+                        line_bot_api.push_message(
+                            PushMessageRequest(
+                                to=user_id,
+                                messages=[FlexMessage(
+                                    alt_text="提醒作業清單",
+                                    contents=FlexContainer.from_dict(bubble)
+                                )]
+                            )
+                        )
+                        print(f"[remind] 已推送提醒給 {user_id}")
+
+                        # 標記已提醒
+                        for task in tasks:
+                            if not task.get("done", False) and not task.get("reminded", False):
+                                task["reminded"] = True
+
+                        save_data(user_id, tasks)
+
+                    except Exception as e:
+                        print(f"[remind] 推送失敗給 {user_id}：{e}")
+                
+                processed_count += 1
+                
             except Exception as e:
-                print(f"[remind] 推送失敗給 {user_id}：{e}")
+                print(f"[remind] 處理用戶 {user_id} 時發生錯誤：{e}")
+                continue
+                
+    except Exception as e:
+        print(f"[remind] 整體錯誤：{e}")
+        
     return "OK"
 
 if __name__ == "__main__":

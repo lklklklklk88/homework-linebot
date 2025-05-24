@@ -2,6 +2,7 @@ import os, json, tempfile
 import firebase_admin
 from firebase_admin import credentials, db
 import datetime
+import atexit
 
 # Firebase 初始化
 cred_json = os.getenv("GOOGLE_CREDENTIALS")
@@ -11,6 +12,8 @@ if not cred_json:
 cred_dict = json.loads(cred_json)
 cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
 
+temp_file_path = None
+
 with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".json") as temp:
     json.dump(cred_dict, temp)
     temp.flush()
@@ -18,6 +21,18 @@ with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".json") as tem
     firebase_admin.initialize_app(cred, {
         'databaseURL': os.getenv("FIREBASE_DB_URL")
     })
+
+# 註冊清理函數
+def cleanup_temp_file():
+    global temp_file_path
+    if temp_file_path and os.path.exists(temp_file_path):
+        try:
+            os.unlink(temp_file_path)
+            print(f"已清理暫存檔案：{temp_file_path}")
+        except Exception as e:
+            print(f"清理暫存檔案失敗：{e}")
+
+atexit.register(cleanup_temp_file)
 
 # 作業資料 CRUD
 def load_data(user_id):
@@ -122,19 +137,26 @@ def add_task(user_id, task):
         print(f"新增任務時發生錯誤：{str(e)}")
         return False
     
+def save_remind_time(user_id, time_str):
+    """統一儲存提醒時間"""
+    try:
+        # 只儲存在一個位置
+        db.reference(f"users/{user_id}/remind_time").set(time_str)
+        return True
+    except Exception as e:
+        print(f"儲存提醒時間失敗：{e}")
+        return False
+
 def get_remind_time(user_id):
     """獲取用戶的提醒時間"""
     try:
-        ref = db.reference(f'remind_times/{user_id}')
+        # 從統一位置讀取
+        ref = db.reference(f"users/{user_id}/remind_time")
         remind_time = ref.get()
-        return remind_time
+        return remind_time if remind_time else "08:00"  # 預設值
     except Exception as e:
         print(f"獲取提醒時間失敗：{e}")
-        return None
-    
-def save_remind_time(user_id, time_str):
-    db.reference(f"remind_times/{user_id}").set(time_str)
-    db.reference(f"users/{user_id}/remind_time").set(time_str)
+        return "08:00"  # 預設值
 
 def load_metadata(user_id):
     ref = db.reference(f"users/{user_id}/meta")

@@ -338,41 +338,43 @@ def get_weekly_progress_for_user(user_id):
         print(f"獲取週進度時發生錯誤：{str(e)}")
         return "抱歉，獲取週進度時發生錯誤，請稍後再試。"
 
-def parse_schedule_response(raw_text):
-    """
-    解析排程回應
-    """
-    print("原始回應：", raw_text)
-    
-    # 檢查是否包含排程標記
-    if "📅 今日排程" in raw_text:
-        parts = raw_text.split("📅 今日排程")
-        explanation = parts[0].strip()
-        schedule_text = "📅 今日排程" + parts[1].strip()
-        
-        # 從排程文字中提取總時數
-        total_hours_match = re.search(r'✅ 今日總時長：(\d+(?:\.\d+)?)', raw_text)
-        total_hours = float(total_hours_match.group(1)) if total_hours_match else 0
-    else:
-        # 如果沒有標記，嘗試直接解析
-        lines = raw_text.strip().split('\n')
-        schedule_lines = []
-        explanation_lines = []
-        
-        for line in lines:
-            if re.match(r'\d+\.\s*[^\s]+', line):
-                schedule_lines.append(line)
-            else:
-                explanation_lines.append(line)
-        
-        explanation = '\n'.join(explanation_lines).strip()
-        schedule_text = '\n'.join(schedule_lines).strip()
-        
-        # 計算總時數
-        blocks = extract_schedule_blocks(schedule_text)
-        total_hours = sum(float(block['duration'].replace('分鐘', '')) / 60 for block in blocks)
+def _parse_hours(raw: str) -> float:
+    # 將全形數字轉半形
+    trans = str.maketrans("０１２３４５６７８９．", "0123456789.")
+    raw = raw.translate(trans)
 
-    return explanation, schedule_text, total_hours
+    # 先找阿拉伯數字
+    m = re.search(r"(\d+(?:\.\d+)?)", raw)
+    if m:
+        return float(m.group(1))
+
+    # 改進的中文數字處理
+    zh_map = {
+        "零":0, "一":1, "二":2, "兩":2, "三":3, "四":4, 
+        "五":5, "六":6, "七":7, "八":8, "九":9, "十":10,
+        "半":0.5, "個半":1.5, "點":0, "點五":0.5
+    }
+    
+    # 處理 "一個半小時" 這類特殊情況
+    if "個半" in raw:
+        # 提取 "X個半" 的 X
+        match = re.search(r"([一二三四五六七八九十]+)個半", raw)
+        if match:
+            num_str = match.group(1)
+            base_num = zh_map.get(num_str, 0)
+            return base_num + 0.5
+    
+    # 處理一般中文數字
+    total = 0
+    for ch in raw:
+        if ch in zh_map:
+            total += zh_map[ch]
+    
+    if total > 0:
+        return float(total)
+
+    # 仍然失敗就拋例外
+    raise ValueError(f"無法解析時間：{raw}")
 
 def get_weekly_progress(user_id):
     """
