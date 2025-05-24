@@ -68,11 +68,14 @@ def handle_estimated_time_input(user_id: str, text: str, reply_token: str):
     使用者輸入預估時間 → 更新 temp_task → 切換 state → 推送「請輸入作業類型」卡片
     """
     try:
-        hours = float(text)
+        hours = _parse_hours(text.strip())
     except ValueError:
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(reply_token, [TextMessage(text="⚠️ 請輸入數字 (小時)！")])
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[TextMessage(text="⚠️ 請輸入有效的時間，例如 2、2.5、2小時、兩小時")]
+                )
             )
         return
 
@@ -140,9 +143,13 @@ def handle_task_type_input(user_id: str, text: str, reply_token: str):
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(
-                reply_token,
-                [FlexMessage(alt_text="請選擇截止日期",
-                             contents=FlexContainer.from_dict(bubble))]
+                reply_token=reply_token,
+                messages=[
+                    FlexMessage(
+                        alt_text="請選擇截止日期",
+                        contents=FlexContainer.from_dict(bubble)
+                    )
+                ]
             )
         )
 
@@ -373,3 +380,26 @@ def get_weekly_progress(user_id):
         "total_hours": total_hours,
         "avg_hours_per_day": avg_hours_per_day
     }
+
+def _parse_hours(raw: str) -> float:
+    # 將全形數字轉半形
+    trans = str.maketrans("０１２３４５６７８９．", "0123456789.")
+    raw = raw.translate(trans)
+
+    # 先找阿拉伯數字
+    m = re.search(r"(\d+(?:\.\d+)?)", raw)
+    if m:
+        return float(m.group(1))
+
+    # 再嘗試最常見的中文數字（簡單對映，足夠日常輸入）
+    zh_map = {"零":0,"一":1,"二":2,"兩":2,"三":3,"四":4,"五":5,
+              "六":6,"七":7,"八":8,"九":9,"十":10,"半":0.5}
+    total = 0
+    for ch in raw:
+        if ch in zh_map:
+            total += zh_map[ch]
+    if total:
+        return float(total)
+
+    # 仍然失敗就拋例外，交給呼叫端回覆錯誤訊息
+    raise ValueError("cannot parse hours")
