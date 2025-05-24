@@ -19,7 +19,7 @@ from linebot.v3.messaging import MessagingApi, ReplyMessageRequest
 from linebot.v3.messaging.models import TextMessage, FlexMessage, FlexContainer
 from linebot.v3.messaging import ApiClient
 from linebot.v3.messaging import Configuration
-from flex_utils import make_schedule_carousel
+
 
 # 設定 logger
 logger = logging.getLogger(__name__)
@@ -49,6 +49,8 @@ def register_postback_handlers(handler):
         "select_task_due": lambda e, u, r: handle_select_task_due(e, u),
         "select_remind_time": lambda e, u, r: handle_select_remind_time(e, u, r),
         "select_add_task_remind_time": lambda e, u, r: handle_select_add_task_remind_time(e, u, r),
+        "set_task_remind": lambda d, u, r: handle_set_task_remind(u, r),
+        "set_add_task_remind": lambda d, u, r: handle_set_add_task_remind(u, r),
     }
 
     PREFIX_HANDLERS = {
