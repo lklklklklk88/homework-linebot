@@ -72,6 +72,31 @@ def remind():
                 if not isinstance(user_data, dict):
                     continue
                     
+                 # 檢查新增作業提醒
+                add_task_remind_enabled = get_add_task_remind_enabled(user_id)
+                add_task_remind_time = get_add_task_remind_time(user_id)
+                
+                if add_task_remind_enabled:
+                    try:
+                        add_remind_dt = datetime.datetime.strptime(add_task_remind_time, "%H:%M")
+                        add_remind_datetime = now.replace(hour=add_remind_dt.hour, minute=add_remind_dt.minute, second=0, microsecond=0)
+                        
+                        time_diff = (now - add_remind_datetime).total_seconds()
+                        if 0 <= time_diff <= 600:  # 10分鐘內
+                            # 檢查今天是否已經有新增作業
+                            tasks = user_data.get("tasks", [])
+                            today_str = now.strftime("%Y-%m-%d")
+                            
+                            # 檢查最後新增作業日期
+                            last_add_date = user_data.get("last_add_task_date", "")
+                            
+                            if last_add_date != today_str:
+                                # 今天還沒新增作業，發送提醒
+                                send_add_task_reminder(user_id)
+                                
+                    except Exception as e:
+                        print(f"[remind] 處理新增作業提醒時發生錯誤：{e}")
+
                 tasks = user_data.get("tasks", [])
                 remind_time = user_data.get("remind_time", "08:00")
                 
@@ -179,6 +204,99 @@ def remind():
         print(f"[remind] 整體錯誤：{e}")
         
     return "OK"
+
+def send_add_task_reminder(user_id):
+    """發送新增作業提醒"""
+    try:
+        display_name = get_line_display_name(user_id)
+        
+        bubble = {
+            "type": "bubble",
+            "size": "kilo",
+            "header": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "📝 作業提醒",
+                        "color": "#FFFFFF",
+                        "size": "lg",
+                        "weight": "bold"
+                    }
+                ],
+                "backgroundColor": "#4A90E2",
+                "paddingAll": "15px"
+            },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": f"Hi {display_name}! 👋",
+                        "size": "md",
+                        "weight": "bold"
+                    },
+                    {
+                        "type": "text",
+                        "text": "今天還沒有新增作業喔！",
+                        "size": "sm",
+                        "color": "#666666",
+                        "wrap": True
+                    },
+                    {
+                        "type": "text",
+                        "text": "記得把今天的作業記錄下來，這樣才不會忘記 😊",
+                        "size": "sm",
+                        "color": "#666666",
+                        "wrap": True,
+                        "margin": "sm"
+                    }
+                ]
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "➕ 立即新增作業",
+                            "data": "add_task"
+                        },
+                        "style": "primary",
+                        "color": "#4A90E2"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "⏰ 調整提醒設定",
+                            "data": "set_remind_time"
+                        },
+                        "style": "secondary"
+                    }
+                ]
+            }
+        }
+        
+        line_bot_api.push_message(
+            PushMessageRequest(
+                to=user_id,
+                messages=[FlexMessage(
+                    alt_text="今天還沒有新增作業喔！",
+                    contents=FlexContainer.from_dict(bubble)
+                )]
+            )
+        )
+        print(f"[remind] 已發送新增作業提醒給 {user_id}")
+        
+    except Exception as e:
+        print(f"[remind] 發送新增作業提醒失敗：{e}")
 
 if __name__ == "__main__":
     app.run()

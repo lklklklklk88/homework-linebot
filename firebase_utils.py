@@ -15,6 +15,7 @@ cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
 temp_file_path = None
 
 with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".json") as temp:
+    temp_file_path = temp.name  # 這行很重要！
     json.dump(cred_dict, temp)
     temp.flush()
     cred = credentials.Certificate(temp.name)
@@ -166,3 +167,40 @@ def save_metadata(user_id, data):
     ref = db.reference(f"users/{user_id}/meta")
     ref.set(data)
 
+def get_add_task_remind_time(user_id):
+    """獲取新增作業提醒時間"""
+    try:
+        ref = db.reference(f"users/{user_id}/add_task_remind_time")
+        remind_time = ref.get()
+        return remind_time if remind_time else "17:00"  # 預設下午5點
+    except Exception as e:
+        print(f"獲取新增作業提醒時間失敗：{e}")
+        return "17:00"
+
+def save_add_task_remind_time(user_id, time_str):
+    """儲存新增作業提醒時間"""
+    try:
+        db.reference(f"users/{user_id}/add_task_remind_time").set(time_str)
+        return True
+    except Exception as e:
+        print(f"儲存新增作業提醒時間失敗：{e}")
+        return False
+
+def get_add_task_remind_enabled(user_id):
+    """獲取是否啟用新增作業提醒"""
+    try:
+        ref = db.reference(f"users/{user_id}/add_task_remind_enabled")
+        enabled = ref.get()
+        return enabled if enabled is not None else True  # 預設啟用
+    except Exception as e:
+        print(f"獲取新增作業提醒狀態失敗：{e}")
+        return True
+
+def save_add_task_remind_enabled(user_id, enabled):
+    """儲存是否啟用新增作業提醒"""
+    try:
+        db.reference(f"users/{user_id}/add_task_remind_enabled").set(enabled)
+        return True
+    except Exception as e:
+        print(f"儲存新增作業提醒狀態失敗：{e}")
+        return False

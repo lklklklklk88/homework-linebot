@@ -42,6 +42,9 @@ def register_postback_handlers(handler):
         "cancel_clear_expired": handle_cancel_clear_expired,
         "clear_completed_all": handle_clear_completed_all,
         "clear_expired_all": handle_clear_expired_all,
+        "select_task_due": lambda e, u, r: handle_select_task_due(e, u),
+        "select_remind_time": lambda e, u, r: handle_select_remind_time(e, u, r),
+        "select_add_task_remind_time": lambda e, u, r: handle_select_add_task_remind_time(e, u, r),
     }
 
     PREFIX_HANDLERS = {
@@ -51,6 +54,9 @@ def register_postback_handlers(handler):
         "delete_completed_": handle_delete_completed,
         "delete_expired_": handle_delete_expired,
         "mark_done_": handle_mark_done,
+        "set_task_remind": handle_set_task_remind,
+        "set_add_task_remind": handle_set_add_task_remind,
+        "toggle_add_task_remind": handle_toggle_add_task_remind,
     }
 
     # 需要特殊處理的 postback（需要完整 event 物件）
@@ -1213,6 +1219,442 @@ def handle_delete_expired(data, user_id, reply_token):
 
 def handle_cancel_clear_expired(user_id, reply_token):
     reply = "❌ 已取消清除已截止作業"
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
+        )
+
+def handle_confirm_add_task(user_id, reply_token):
+    temp_task = get_temp_task(user_id)
+    if not temp_task:
+        reply = "⚠️ 發生錯誤，請重新開始新增作業流程"
+    else:
+        try:
+            required_fields = ["task", "estimated_time", "category"]
+            if any(f not in temp_task or temp_task[f] is None for f in required_fields):
+                reply = "⚠️ 缺少必要資訊，請重新開始新增作業流程"
+            else:
+                if isinstance(temp_task["estimated_time"], str):
+                    temp_task["estimated_time"] = float(temp_task["estimated_time"])
+
+                update_task_history(user_id, temp_task["task"], temp_task["category"], temp_task["estimated_time"])
+                add_task(user_id, temp_task)
+                
+                # 記錄今天已新增作業
+                today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+                db.reference(f"users/{user_id}/last_add_task_date").set(today)
+                
+                clear_temp_task(user_id)
+                clear_user_state(user_id)
+                reply = "✅ 作業已成功新增！"
+        except Exception as e:
+            print(f"新增作業失敗：{e}")
+            reply = "❌ 發生錯誤，請稍後再試"
+
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
+        )
+
+def handle_set_remind_time(user_id, reply_token):
+    """顯示提醒設定選擇介面"""
+    try:
+        bubble = {
+            "type": "bubble",
+            "size": "mega",
+            "header": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "⏰ 提醒設定",
+                        "color": "#FFFFFF",
+                        "size": "xl",
+                        "weight": "bold"
+                    }
+                ],
+                "backgroundColor": "#FF6B6B",
+                "paddingAll": "20px"
+            },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "lg",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "請選擇要設定的提醒類型",
+                        "size": "md",
+                        "color": "#333333",
+                        "weight": "bold"
+                    },
+                    {
+                        "type": "separator",
+                        "margin": "md"
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "spacing": "md",
+                        "contents": [
+                            {
+                                "type": "button",
+                                "action": {
+                                    "type": "postback",
+                                    "label": "📋 未完成作業提醒",
+                                    "data": "set_task_remind"
+                                },
+                                "style": "secondary",
+                                "height": "sm"
+                            },
+                            {
+                                "type": "button",
+                                "action": {
+                                    "type": "postback",
+                                    "label": "📝 新增作業提醒",
+                                    "data": "set_add_task_remind"
+                                },
+                                "style": "secondary",
+                                "height": "sm"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "margin": "lg",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "💡 小提示",
+                                "size": "sm",
+                                "color": "#666666",
+                                "weight": "bold"
+                            },
+                            {
+                                "type": "text",
+                                "text": "• 未完成作業提醒：每天提醒您待辦的作業",
+                                "size": "xs",
+                                "color": "#888888",
+                                "wrap": True,
+                                "margin": "sm"
+                            },
+                            {
+                                "type": "text",
+                                "text": "• 新增作業提醒：提醒您今天記錄作業",
+                                "size": "xs",
+                                "color": "#888888",
+                                "wrap": True,
+                                "margin": "sm"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "❌ 取消",
+                            "data": "cancel_set_remind"
+                        },
+                        "style": "secondary"
+                    }
+                ]
+            }
+        }
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[FlexMessage(
+                        alt_text="提醒設定",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                )
+            )
+            
+    except Exception as e:
+        print(f"設定提醒時間功能錯誤：{e}")
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[TextMessage(text="❌ 提醒時間功能發生錯誤，請稍後再試")]
+                )
+            )
+
+def handle_set_task_remind(user_id, reply_token):
+    """設定未完成作業提醒時間"""
+    try:
+        now_time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%H:%M")
+        current_remind_time = get_remind_time(user_id)
+        
+        bubble = {
+            "type": "bubble",
+            "size": "kilo",
+            "header": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "📋 未完成作業提醒",
+                        "color": "#FFFFFF",
+                        "size": "lg",
+                        "weight": "bold"
+                    }
+                ],
+                "backgroundColor": "#4A90E2",
+                "paddingAll": "15px"
+            },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": f"目前提醒時間：{current_remind_time}",
+                        "size": "md",
+                        "weight": "bold",
+                        "color": "#333333"
+                    },
+                    {
+                        "type": "text",
+                        "text": "每天在設定的時間提醒您未完成的作業",
+                        "size": "sm",
+                        "color": "#666666",
+                        "wrap": True
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "datetimepicker",
+                            "label": "⏰ 選擇新的提醒時間",
+                            "data": "select_remind_time",
+                            "mode": "time",
+                            "initial": current_remind_time,
+                            "max": "23:59",
+                            "min": "00:00"
+                        },
+                        "style": "primary",
+                        "margin": "lg"
+                    }
+                ]
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "← 返回",
+                            "data": "set_remind_time"
+                        },
+                        "style": "secondary"
+                    }
+                ]
+            }
+        }
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[FlexMessage(
+                        alt_text="設定未完成作業提醒",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                )
+            )
+    except Exception as e:
+        print(f"設定未完成作業提醒錯誤：{e}")
+
+def handle_set_add_task_remind(user_id, reply_token):
+    """設定新增作業提醒"""
+    try:
+        current_time = get_add_task_remind_time(user_id)
+        is_enabled = get_add_task_remind_enabled(user_id)
+        
+        bubble = {
+            "type": "bubble",
+            "size": "kilo",
+            "header": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "📝 新增作業提醒",
+                        "color": "#FFFFFF",
+                        "size": "lg",
+                        "weight": "bold"
+                    }
+                ],
+                "backgroundColor": "#00BFA5",
+                "paddingAll": "15px"
+            },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "提醒狀態：",
+                                "size": "md",
+                                "color": "#333333",
+                                "flex": 0
+                            },
+                            {
+                                "type": "text",
+                                "text": "已啟用" if is_enabled else "已停用",
+                                "size": "md",
+                                "weight": "bold",
+                                "color": "#00BFA5" if is_enabled else "#FF6B6B",
+                                "flex": 0,
+                                "margin": "sm"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "text",
+                        "text": f"提醒時間：{current_time}",
+                        "size": "md",
+                        "color": "#333333"
+                    },
+                    {
+                        "type": "text",
+                        "text": "每天提醒您記錄今天的作業",
+                        "size": "sm",
+                        "color": "#666666",
+                        "wrap": True,
+                        "margin": "sm"
+                    },
+                    {
+                        "type": "separator",
+                        "margin": "lg"
+                    },
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "spacing": "sm",
+                        "margin": "lg",
+                        "contents": [
+                            {
+                                "type": "button",
+                                "action": {
+                                    "type": "postback",
+                                    "label": "🔔 啟用提醒" if not is_enabled else "🔕 停用提醒",
+                                    "data": "toggle_add_task_remind"
+                                },
+                                "style": "primary" if not is_enabled else "secondary",
+                                "color": "#00BFA5" if not is_enabled else "#FF6B6B"
+                            },
+                            {
+                                "type": "button",
+                                "action": {
+                                    "type": "datetimepicker",
+                                    "label": "⏰ 變更提醒時間",
+                                    "data": "select_add_task_remind_time",
+                                    "mode": "time",
+                                    "initial": current_time,
+                                    "max": "23:59",
+                                    "min": "00:00"
+                                },
+                                "style": "secondary"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "← 返回",
+                            "data": "set_remind_time"
+                        },
+                        "style": "secondary"
+                    }
+                ]
+            }
+        }
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[FlexMessage(
+                        alt_text="設定新增作業提醒",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                )
+            )
+    except Exception as e:
+        print(f"設定新增作業提醒錯誤：{e}")
+
+def handle_toggle_add_task_remind(user_id, reply_token):
+    """切換新增作業提醒狀態"""
+    try:
+        current_status = get_add_task_remind_enabled(user_id)
+        new_status = not current_status
+        save_add_task_remind_enabled(user_id, new_status)
+        
+        if new_status:
+            reply = "🔔 已啟用新增作業提醒！\n每天都會提醒您記錄作業喔～"
+        else:
+            reply = "🔕 已停用新增作業提醒。"
+        
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[TextMessage(text=reply)]
+                )
+            )
+            
+        # 重新顯示設定介面
+        handle_set_add_task_remind(user_id, reply_token)
+        
+    except Exception as e:
+        print(f"切換新增作業提醒狀態失敗：{e}")
+
+def handle_select_add_task_remind_time(event, user_id, reply_token):
+    """處理新增作業提醒時間選擇"""
+    try:
+        time_param = event.postback.params.get("time", "")
+        if not time_param:
+            reply = "❌ 未取得提醒時間，請重新選擇"
+        else:
+            try:
+                save_add_task_remind_time(user_id, time_param)
+                reply = f"✅ 新增作業提醒時間已設定為：{time_param}"
+            except Exception as e:
+                print(f"保存新增作業提醒時間失敗：{e}")
+                reply = "❌ 保存提醒時間失敗，請稍後再試"
+
+    except Exception as e:
+        print(f"選擇新增作業提醒時間錯誤：{e}")
+        reply = "❌ 設定提醒時間時發生錯誤"
+
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
