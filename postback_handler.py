@@ -606,7 +606,6 @@ def handle_view_tasks(user_id, reply_token):
             {"type": "text", "text": "作業名稱", "size": "sm", "weight": "bold", "flex": 3},
             {"type": "text", "text": "類型", "size": "sm", "weight": "bold", "flex": 2, "align": "center"},
             {"type": "text", "text": "時間", "size": "sm", "weight": "bold", "flex": 1, "align": "center"},
-            {"type": "text", "text": "截止日", "size": "sm", "weight": "bold", "flex": 1, "align": "center"},
             {"type": "text", "text": "狀態", "size": "sm", "weight": "bold", "flex": 1, "align": "center"}
         ]
     }
@@ -682,14 +681,6 @@ def handle_view_tasks(user_id, reply_token):
                 },
                 {
                     "type": "text",
-                    "text": due_display,
-                    "size": "xs",
-                    "flex": 1,
-                    "align": "center",
-                    "color": "#FF5551" if is_expired else "#888888"
-                },
-                {
-                    "type": "text",
                     "text": status_text,
                     "size": "sm",
                     "flex": 1,
@@ -700,6 +691,26 @@ def handle_view_tasks(user_id, reply_token):
         }
         
         table_contents.append(task_row)
+        
+        # 如果有截止日期，在下方顯示
+        if due_date != "未設定":
+            due_row = {
+                "type": "box",
+                "layout": "horizontal",
+                "spacing": "sm",
+                "contents": [
+                    {"type": "filler", "flex": 3},
+                    {
+                        "type": "text",
+                        "text": f"截止日： {due_display}",
+                        "size": "xs",
+                        "color": "#FF5551" if is_expired else "#888888",
+                        "flex": 3,
+                        "align": "end"
+                    }
+                ]
+            }
+            table_contents.append(due_row)
         
         # 添加分隔線（除了最後一個）
         if i < len(tasks) - 1:
