@@ -203,9 +203,28 @@ def make_schedule_card(task):
 
 
 def make_schedule_carousel(tasks):
+    bubbles = []
+    for task in tasks[:10]:
+        name = task.get("task", "未命名")
+        due = task.get("due", "未設定")
+
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {"type": "text", "text": f"📘 {name}", "weight": "bold", "size": "md", "wrap": True},
+                    {"type": "text", "text": f"📅 截止：{due}", "size": "sm", "color": "#888"}
+                ]
+            }
+        }
+
+        bubbles.append(bubble)
+
     return {
         "type": "carousel",
-        "contents": [make_schedule_card(task) for task in tasks[:10]]
+        "contents": bubbles
     }
 
 def make_weekly_progress_card(completed_tasks, total_hours, avg_hours_per_day):
@@ -251,6 +270,3 @@ def make_weekly_progress_card(completed_tasks, total_hours, avg_hours_per_day):
         }
     }
     return bubble
-
-# 其他卡片略（保持不變）...
-# make_schedule_card, make_schedule_carousel 保留原樣

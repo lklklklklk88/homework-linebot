@@ -192,19 +192,6 @@ def register_message_handlers(handler):
                 )
             return
 
-        else:
-            reply = "請使用以下指令：\n1. 新增作業 作業內容\n2. 完成作業 編號\n3. 查看作業"
-
-        with ApiClient(configuration) as api_client:
-            messaging_api = MessagingApi(api_client)
-            messaging_api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=reply)]
-                )
-            )
-        return
-
 def get_today_schedule_for_user(user_id):
     """
     獲取用戶今日排程

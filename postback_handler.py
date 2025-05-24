@@ -858,14 +858,60 @@ def handle_view_tasks(user_id, reply_token):
         )
 
 def handle_complete_task_direct(user_id, reply_token):
-    from postback_handler import register_postback_handlers  # 防止循環 import
-    event = type("Event", (), {
-        "postback": type("Postback", (), {"data": "complete_task"}),
-        "source": type("Source", (), {"user_id": user_id}),
-        "reply_token": reply_token
-    })
-    register_postback_handlers(lambda _: None).handle_postback(event)
+    tasks = load_data(user_id)
+    if not tasks:
+        reply = "目前沒有任何作業。"
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
+            )
+        return
 
+    buttons = []
+    for i, task in enumerate(tasks):
+        if not task.get("done", False):
+            buttons.append({
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": f"✅ {task['task']}",
+                    "data": f"mark_done_{i}"
+                },
+                "style": "secondary"
+            })
+
+    if not buttons:
+        reply = "✅ 所有作業都已完成囉！"
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
+            )
+        return
+
+    bubble = {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": [
+                {"type": "text", "text": "請選擇要標記完成的作業：", "weight": "bold", "size": "lg"},
+                *buttons
+            ]
+        }
+    }
+
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[FlexMessage(
+                    alt_text="完成作業",
+                    contents=FlexContainer.from_dict(bubble)
+                )]
+            )
+        )
+        
 def handle_set_remind_time(user_id, reply_token):
     # 手動觸發原本 postback handler 的 set_remind_time UI
     from postback_handler import register_postback_handlers
