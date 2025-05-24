@@ -477,6 +477,31 @@ def register_postback_handlers(handler):
                     )
                 return
 
+            elif data.startswith("mark_done_"):
+                try:
+                    task_index = int(data.replace("mark_done_", ""))
+                    tasks = load_data(user_id)
+
+                    if 0 <= task_index < len(tasks):
+                        tasks[task_index]["done"] = True
+                        save_data(user_id, tasks)
+                        reply = f"✅ 已完成作業：{tasks[task_index]['task']}"
+                    else:
+                        reply = "❌ 找不到該作業"
+
+                except Exception as e:
+                    print(f"完成作業失敗：{str(e)}")
+                    reply = "❌ 發生錯誤，請稍後再試"
+
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=reply_token,
+                            messages=[TextMessage(text=reply)]
+                        )
+                    )
+                return
+
             # 處理選擇提醒時間
             elif data == "select_remind_time":
                 # 從 postback 參數中獲取時間
@@ -510,6 +535,42 @@ def register_postback_handlers(handler):
                     )
                 return
 
+            elif data == "clear_completed":
+                bubble = {
+                    "type": "bubble",
+                    "body": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "spacing": "md",
+                        "contents": [
+                            {"type": "text", "text": "🧹 清除已完成作業", "weight": "bold", "size": "lg"},
+                            {"type": "text", "text": "請選擇清除方式：", "size": "sm", "color": "#888888"},
+                            {
+                                "type": "button",
+                                "action": {"type": "postback", "label": "🧼 手動選擇清除", "data": "clear_completed_select"},
+                                "style": "secondary"
+                            },
+                            {
+                                "type": "button",
+                                "action": {"type": "postback", "label": "⚡ 一鍵清除全部", "data": "clear_completed_all"},
+                                "style": "primary"
+                            }
+                        ]
+                    }
+                }
+
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=reply_token,
+                            messages=[FlexMessage(
+                                alt_text="清除已完成作業",
+                                contents=FlexContainer.from_dict(bubble)
+                            )]
+                        )
+                    )
+                return
+            
             # 處理一鍵清除已完成作業
             elif data == "clear_completed_all":
                 # 載入任務數據
@@ -540,6 +601,149 @@ def register_postback_handlers(handler):
                             reply_token=event.reply_token,
                             messages=[TextMessage(text=reply)]
                         )
+                    )
+                return
+
+            elif data == "clear_expired":
+                bubble = {
+                    "type": "bubble",
+                    "body": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "spacing": "md",
+                        "contents": [
+                            {"type": "text", "text": "🗑️ 清除已截止作業", "weight": "bold", "size": "lg"},
+                            {"type": "text", "text": "請選擇清除方式：", "size": "sm", "color": "#888888"},
+                            {
+                                "type": "button",
+                                "action": {"type": "postback", "label": "🧼 手動選擇清除", "data": "clear_expired_select"},
+                                "style": "secondary"
+                            },
+                            {
+                                "type": "button",
+                                "action": {"type": "postback", "label": "⚡ 一鍵清除全部", "data": "clear_expired_all"},
+                                "style": "primary"
+                            }
+                        ]
+                    }
+                }
+
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=reply_token,
+                            messages=[FlexMessage(
+                                alt_text="清除已截止作業",
+                                contents=FlexContainer.from_dict(bubble)
+                            )]
+                        )
+                    )
+                return
+
+            elif data == "clear_expired_select":
+                try:
+                    tasks = load_data(user_id)
+                    if not tasks:
+                        reply = "✅ 目前沒有任何作業"
+                        with ApiClient(configuration) as api_client:
+                            MessagingApi(api_client).reply_message(
+                                ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
+                            )
+                        return
+
+                    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
+                    expired_tasks = []
+                    for i, task in enumerate(tasks):
+                        due = task.get("due", "未設定")
+                        if due != "未設定":
+                            try:
+                                due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
+                                if due_date < now and not task.get("done", False):
+                                    expired_tasks.append((i, task))
+                            except:
+                                continue
+
+                    if not expired_tasks:
+                        reply = "✅ 沒有已截止的作業需要清除"
+                        with ApiClient(configuration) as api_client:
+                            MessagingApi(api_client).reply_message(
+                                ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
+                            )
+                        return
+
+                    buttons = []
+                    for i, task in expired_tasks:
+                        buttons.append({
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": f"🗑️ {task['task']}",
+                                "data": f"delete_expired_{i}"
+                            },
+                            "style": "secondary"
+                        })
+
+                    # 添加取消按鈕
+                    buttons.append({
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "❌ 取消",
+                            "data": "cancel_clear_expired"
+                        },
+                        "style": "secondary"
+                    })
+
+                    bubble = {
+                        "type": "bubble",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "spacing": "md",
+                            "contents": [
+                                {"type": "text", "text": "選擇要清除的已截止作業：", "weight": "bold", "size": "lg"},
+                                {"type": "text", "text": f"共有 {len(expired_tasks)} 筆已截止作業", "size": "sm", "color": "#888888"},
+                                *buttons
+                            ]
+                        }
+                    }
+
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=reply_token,
+                                messages=[FlexMessage(
+                                    alt_text="選擇要清除的已截止作業",
+                                    contents=FlexContainer.from_dict(bubble)
+                                )]
+                            )
+                        )
+                    return
+                except Exception as e:
+                    print(f"處理 clear_expired_select 錯誤：{str(e)}")
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text="❌ 發生錯誤，請稍後再試")])
+                        )
+                    return
+
+            elif data.startswith("delete_expired_"):
+                try:
+                    index = int(data.replace("delete_expired_", ""))
+                    tasks = load_data(user_id)
+                    if index < 0 or index >= len(tasks):
+                        raise Exception("無效索引")
+
+                    deleted_task = tasks.pop(index)
+                    save_data(user_id, tasks)
+                    reply = f"✅ 已刪除已截止作業：{deleted_task['task']}"
+                except Exception as e:
+                    print(f"刪除已截止作業失敗：{str(e)}")
+                    reply = "❌ 無法刪除該作業"
+
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
                     )
                 return
 
@@ -858,60 +1062,14 @@ def handle_view_tasks(user_id, reply_token):
         )
 
 def handle_complete_task_direct(user_id, reply_token):
-    tasks = load_data(user_id)
-    if not tasks:
-        reply = "目前沒有任何作業。"
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
-            )
-        return
+    from postback_handler import register_postback_handlers  # 防止循環 import
+    event = type("Event", (), {
+        "postback": type("Postback", (), {"data": "complete_task"}),
+        "source": type("Source", (), {"user_id": user_id}),
+        "reply_token": reply_token
+    })
+    register_postback_handlers(lambda _: None).handle_postback(event)
 
-    buttons = []
-    for i, task in enumerate(tasks):
-        if not task.get("done", False):
-            buttons.append({
-                "type": "button",
-                "action": {
-                    "type": "postback",
-                    "label": f"✅ {task['task']}",
-                    "data": f"mark_done_{i}"
-                },
-                "style": "secondary"
-            })
-
-    if not buttons:
-        reply = "✅ 所有作業都已完成囉！"
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
-            )
-        return
-
-    bubble = {
-        "type": "bubble",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "md",
-            "contents": [
-                {"type": "text", "text": "請選擇要標記完成的作業：", "weight": "bold", "size": "lg"},
-                *buttons
-            ]
-        }
-    }
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[FlexMessage(
-                    alt_text="完成作業",
-                    contents=FlexContainer.from_dict(bubble)
-                )]
-            )
-        )
-        
 def handle_set_remind_time(user_id, reply_token):
     # 手動觸發原本 postback handler 的 set_remind_time UI
     from postback_handler import register_postback_handlers

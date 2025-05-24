@@ -50,7 +50,7 @@ def register_message_handlers(handler):
             if intent == "add_task":
                 handle_add_task(user_id, event.reply_token)
                 return
-            elif intent == "view_task":
+            elif intent == "view_tasks":
                 handle_view_tasks(user_id, event.reply_token)
                 return
             elif intent == "complete_task":
