@@ -1,5 +1,6 @@
 import re
 import datetime
+from typing import List, Dict, Any
 
 # 常數定義
 TIME_RANGE_PATTERN = r'\d+\.\s*([^\s]+)?\s*(\d{1,2}:\d{2})\s*[~-]\s*(\d{1,2}:\d{2})\s*[｜|]\s*(.*?)(?:\s*[（(](\d+)分鐘[）)])?$'
@@ -270,3 +271,72 @@ def make_weekly_progress_card(completed_tasks, total_hours, avg_hours_per_day):
         }
     }
     return bubble
+
+def _make_history_buttons(items: List[str], data_prefix: str) -> List[Dict[str, Any]]:
+    """
+    共用：把 ['2小時','3小時'] 轉成 Flex button 陣列
+    """
+    return [
+        {
+            "type": "button",
+            "action": {
+                "type": "postback",
+                "label": item,
+                "data": f"{data_prefix}{item.replace('小時', '')}"
+            },
+            "style": "secondary",
+        }
+        for item in items
+    ]
+
+def make_time_history_bubble(time_history: List[str]) -> Dict[str, Any]:
+    """
+    ⏰ 「預估完成時間」泡泡；history 最多 3 筆
+    """
+    buttons = _make_history_buttons(time_history[-3:], "select_time_")
+    buttons.append(  # 取消鈕
+        {
+            "type": "button",
+            "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_add_task"},
+            "style": "secondary",
+        }
+    )
+    return {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": [
+                {"type": "text", "text": "⏰ 請輸入預估完成時間", "weight": "bold", "size": "lg"},
+                {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
+                *buttons,
+            ],
+        },
+    }
+
+def make_type_history_bubble(type_history: List[str]) -> Dict[str, Any]:
+    """
+    📝 「作業類型」泡泡；history 最多 3 筆
+    """
+    buttons = _make_history_buttons(type_history[-3:], "select_type_")
+    buttons.append(
+        {
+            "type": "button",
+            "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_add_task"},
+            "style": "secondary",
+        }
+    )
+    return {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": [
+                {"type": "text", "text": "📝 請輸入作業類型", "weight": "bold", "size": "lg"},
+                {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
+                *buttons,
+            ],
+        },
+    }

@@ -15,6 +15,10 @@ from postback_handler import (
     handle_clear_completed,
     handle_clear_expired
 )
+from flex_utils import (
+    make_time_history_bubble,
+    make_type_history_bubble,
+)
 from task_parser import parse_task_from_text
 from intent_utils import classify_intent_by_gemini
 from flex_utils import make_schedule_carousel, extract_schedule_blocks, make_timetable_card, make_weekly_progress_card
@@ -27,6 +31,122 @@ from linebot.v3.messaging.models import TextMessage, FlexMessage, FlexContainer
 
 configuration = Configuration(access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
 
+# === ➊ 處理「手寫作業名稱」 ================================
+def handle_task_name_input(user_id: str, text: str, reply_token: str):
+    """
+    使用者輸入作業名稱 → 儲存暫存資料 → 切換 state → 推送「請輸入預估時間」卡片
+    """
+    temp_task = {"task": text}
+    set_temp_task(user_id, temp_task)
+    set_user_state(user_id, "awaiting_task_time")
+
+    # 讀取時間歷史（最多 3 筆）
+    _, _, time_history = get_task_history(user_id)
+    buttons = [{
+        "type": "button",
+        "action": {"type": "postback", "label": t, "data": f"select_time_{t.replace('小時', '')}"},
+        "style": "secondary"
+    } for t in time_history[-3:]]
+
+    bubble = make_time_history_bubble(time_history)
+
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[
+                    FlexMessage(alt_text="請輸入預估完成時間",
+                                contents=FlexContainer.from_dict(bubble)),
+                    TextMessage(text="請輸入預估完成時間（小時）：")
+                ]
+            )
+        )
+
+# === ➋ 處理「手寫預估時間」 ================================
+def handle_estimated_time_input(user_id: str, text: str, reply_token: str):
+    """
+    使用者輸入預估時間 → 更新 temp_task → 切換 state → 推送「請輸入作業類型」卡片
+    """
+    try:
+        hours = float(text)
+    except ValueError:
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(reply_token, [TextMessage(text="⚠️ 請輸入數字 (小時)！")])
+            )
+        return
+
+    temp_task = get_temp_task(user_id) or {}
+    temp_task["estimated_time"] = hours
+    set_temp_task(user_id, temp_task)
+    set_user_state(user_id, "awaiting_task_type")
+
+    name_history, type_history, _ = get_task_history(user_id)
+    buttons = [{
+        "type": "button",
+        "action": {"type": "postback", "label": t, "data": f"select_type_{t}"},
+        "style": "secondary"
+    } for t in type_history[-3:]]
+
+    bubble = make_type_history_bubble(type_history)
+
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token,
+                [
+                    FlexMessage(alt_text="請輸入作業類型",
+                                contents=FlexContainer.from_dict(bubble)),
+                    TextMessage(text="請輸入作業類型：")
+                ]
+            )
+        )
+
+# === ➌ 處理「手寫作業類型」 ================================
+def handle_task_type_input(user_id: str, text: str, reply_token: str):
+    """
+    使用者輸入作業類型 → 更新 temp_task → 切到選截止日期 state → 推送日期選擇器
+    """
+    temp_task = get_temp_task(user_id) or {}
+    temp_task["category"] = text.strip()
+    set_temp_task(user_id, temp_task)
+    set_user_state(user_id, "awaiting_task_due")
+
+    today = datetime.datetime.now(
+        datetime.timezone(datetime.timedelta(hours=8))
+    ).strftime("%Y-%m-%d")
+
+    bubble = {
+        "type": "bubble",
+        "body": {
+            "type": "box", "layout": "vertical", "spacing": "md",
+            "contents": [
+                {"type": "text", "text": "📅 請選擇截止日期", "weight": "bold", "size": "md"},
+                {"type": "button",
+                 "action": {"type": "datetimepicker", "label": "📅 選擇日期",
+                            "data": "select_task_due", "mode": "date",
+                            "initial": today, "max": "2099-12-31", "min": today},
+                 "style": "primary"},
+                {"type": "button",
+                 "action": {"type": "postback", "label": "❌ 不設定截止日期", "data": "no_due_date"},
+                 "style": "secondary"},
+                {"type": "button",
+                 "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_add_task"},
+                 "style": "secondary"}
+            ]
+        }
+    }
+
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token,
+                [FlexMessage(alt_text="請選擇截止日期",
+                             contents=FlexContainer.from_dict(bubble))]
+            )
+        )
+
+
 def register_message_handlers(handler):
     @handler.add(MessageEvent)
     def handle_message(event):
@@ -37,11 +157,19 @@ def register_message_handlers(handler):
             return
 
         text = event.message.text.strip()
-        data = load_data(user_id)
         state = get_user_state(user_id) 
 
+        if state == "awaiting_task_name":
+            handle_task_name_input(user_id, text, event.reply_token)
+            return
+        elif state == "awaiting_task_time":
+            handle_estimated_time_input(user_id, text, event.reply_token)
+            return
+        elif state == "awaiting_task_type":
+            handle_task_type_input(user_id, text, event.reply_token)
+            return
+    
         intent = None
-        # 只有當沒有流程進行中，才進行語意判斷與快速新增
         if not state:
             intent = classify_intent_by_gemini(text)
 
@@ -66,71 +194,8 @@ def register_message_handlers(handler):
             elif intent == "show_schedule":
                 handle_show_schedule(user_id, event.reply_token)
                 return 
-
-        # 🌟 處理使用者輸入作業名稱
-        if state == "awaiting_task_name":
-            temp_task = {"task": text}
-            set_temp_task(user_id, temp_task)
-            set_user_state(user_id, "awaiting_task_time")
-
-            # 接著顯示「請輸入預估完成時間」的 UI
-            from firebase_utils import get_task_history
-            _, _, time_history = get_task_history(user_id)
-
-            bubble = {
-                "type": "bubble",
-                "body": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "spacing": "md",
-                    "contents": [
-                        {"type": "text", "text": "⏰ 請輸入預估完成時間", "weight": "bold", "size": "lg"},
-                        {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"}
-                    ]
-                }
-            }
-
-            if time_history:
-                for time in time_history:
-                    bubble["body"]["contents"].append({
-                        "type": "button",
-                        "action": {
-                            "type": "postback",
-                            "label": time,
-                            "data": f"select_time_{time.replace('小時', '')}"
-                        },
-                        "style": "secondary"
-                    })
-
-            bubble["body"]["contents"].append({
-                "type": "button",
-                "action": {
-                    "type": "postback",
-                    "label": "❌ 取消",
-                    "data": "cancel_add_task"
-                },
-                "style": "secondary"
-            })
-
-            messages = [
-                FlexMessage(
-                    alt_text="請輸入預估完成時間",
-                    contents=FlexContainer.from_dict(bubble)
-                ),
-                TextMessage(text="請輸入預估完成時間（小時）：")
-            ]
-
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=messages
-                    )
-                )
-            return
-
-
-        elif text == "操作":
+        
+        if text == "操作":
             bubble = {
                 "type": "bubble",
                 "body": {
