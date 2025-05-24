@@ -63,7 +63,7 @@ def register_postback_handlers(handler):
             elif data == "view_tasks":
                 handle_view_tasks(user_id, reply_token)
                 return
-
+            
             elif data == "complete_task":
                 handle_complete_task_direct(user_id, reply_token)
                 return
@@ -528,7 +528,7 @@ def handle_show_schedule(user_id, reply_token):
         )
 
 def handle_view_tasks(user_id, reply_token):
-    from flex_utils import make_schedule_carousel
+    """顯示作業列表為一頁式表格"""
     tasks = load_data(user_id)
     if not tasks:
         reply = "目前沒有任何作業。"
@@ -538,27 +538,252 @@ def handle_view_tasks(user_id, reply_token):
             )
         return
 
-    # 顯示作業卡片
-    card = make_schedule_carousel(tasks)
+    # 創建表格內容
+    table_contents = [
+        {"type": "text", "text": "📋 作業列表", "weight": "bold", "size": "xl", "color": "#1DB446"},
+        {"type": "separator", "margin": "md"}
+    ]
+    
+    # 統計資訊
+    total_tasks = len(tasks)
+    completed_tasks = len([t for t in tasks if t.get("done", False)])
+    pending_tasks = total_tasks - completed_tasks
+    
+    # 添加統計資訊
+    stats_box = {
+        "type": "box",
+        "layout": "horizontal",
+        "spacing": "md",
+        "margin": "md",
+        "contents": [
+            {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {"type": "text", "text": str(total_tasks), "size": "xl", "weight": "bold", "align": "center"},
+                    {"type": "text", "text": "總計", "size": "sm", "color": "#666666", "align": "center"}
+                ],
+                "flex": 1
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {"type": "text", "text": str(pending_tasks), "size": "xl", "weight": "bold", "align": "center", "color": "#FF5551"},
+                    {"type": "text", "text": "待完成", "size": "sm", "color": "#666666", "align": "center"}
+                ],
+                "flex": 1
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {"type": "text", "text": str(completed_tasks), "size": "xl", "weight": "bold", "align": "center", "color": "#1DB446"},
+                    {"type": "text", "text": "已完成", "size": "sm", "color": "#666666", "align": "center"}
+                ],
+                "flex": 1
+            }
+        ]
+    }
+    table_contents.append(stats_box)
+    table_contents.append({"type": "separator", "margin": "md"})
+    
+    # 添加表格標題行
+    header_box = {
+        "type": "box",
+        "layout": "horizontal",
+        "spacing": "sm",
+        "margin": "md",
+        "contents": [
+            {"type": "text", "text": "作業名稱", "size": "sm", "weight": "bold", "flex": 3},
+            {"type": "text", "text": "類型", "size": "sm", "weight": "bold", "flex": 2, "align": "center"},
+            {"type": "text", "text": "時間", "size": "sm", "weight": "bold", "flex": 1, "align": "center"},
+            {"type": "text", "text": "狀態", "size": "sm", "weight": "bold", "flex": 1, "align": "center"}
+        ]
+    }
+    table_contents.append(header_box)
+    table_contents.append({"type": "separator", "margin": "sm"})
+    
+    # 添加每個作業的行
+    for i, task in enumerate(tasks):
+        # 處理作業狀態和顏色
+        is_done = task.get("done", False)
+        due_date = task.get("due", "未設定")
+        
+        # 判斷是否過期
+        is_expired = False
+        if due_date != "未設定" and not is_done:
+            try:
+                due_datetime = datetime.datetime.strptime(due_date, "%Y-%m-%d").date()
+                now_date = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
+                is_expired = due_datetime < now_date
+            except:
+                pass
+        
+        # 設定狀態文字和顏色
+        if is_done:
+            status_text = "✅"
+            status_color = "#1DB446"
+        elif is_expired:
+            status_text = "⏰"
+            status_color = "#FF5551"
+        else:
+            status_text = "⏳"
+            status_color = "#FFAA00"
+        
+        # 處理截止日期顯示
+        due_display = due_date if due_date != "未設定" else "-"
+        if due_date != "未設定":
+            try:
+                due_datetime = datetime.datetime.strptime(due_date, "%Y-%m-%d")
+                due_display = due_datetime.strftime("%m/%d")
+            except:
+                pass
+        
+        # 創建作業行
+        task_row = {
+            "type": "box",
+            "layout": "horizontal",
+            "spacing": "sm",
+            "margin": "sm",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": task.get("task", "未命名"),
+                    "size": "sm",
+                    "flex": 3,
+                    "wrap": True,
+                    "color": "#666666" if is_done else "#333333"
+                },
+                {
+                    "type": "text",
+                    "text": task.get("category", "-"),
+                    "size": "xs",
+                    "flex": 2,
+                    "align": "center",
+                    "color": "#888888"
+                },
+                {
+                    "type": "text",
+                    "text": f"{task.get('estimated_time', 0)}h",
+                    "size": "xs",
+                    "flex": 1,
+                    "align": "center",
+                    "color": "#888888"
+                },
+                {
+                    "type": "text",
+                    "text": status_text,
+                    "size": "sm",
+                    "flex": 1,
+                    "align": "center",
+                    "color": status_color
+                }
+            ]
+        }
+        
+        table_contents.append(task_row)
+        
+        # 如果有截止日期，在下方顯示
+        if due_date != "未設定":
+            due_row = {
+                "type": "box",
+                "layout": "horizontal",
+                "spacing": "sm",
+                "contents": [
+                    {"type": "filler", "flex": 3},
+                    {
+                        "type": "text",
+                        "text": f"📅 {due_display}",
+                        "size": "xs",
+                        "color": "#FF5551" if is_expired else "#888888",
+                        "flex": 3,
+                        "align": "end"
+                    }
+                ]
+            }
+            table_contents.append(due_row)
+        
+        # 添加分隔線（除了最後一個）
+        if i < len(tasks) - 1:
+            table_contents.append({"type": "separator", "margin": "sm", "color": "#EEEEEE"})
+    
+    # 創建完整的卡片
+    bubble = {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "none",
+            "contents": table_contents
+        },
+        "footer": {
+            "type": "box",
+            "layout": "horizontal",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "action": {"type": "postback", "label": "✅ 完成作業", "data": "complete_task"},
+                    "style": "primary",
+                    "flex": 1
+                },
+                {
+                    "type": "button",
+                    "action": {"type": "postback", "label": "➕ 新增作業", "data": "add_task"},
+                    "style": "secondary",
+                    "flex": 1
+                }
+            ]
+        }
+    }
+    
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(reply_token=reply_token, messages=[FlexMessage(
-                alt_text="作業清單", contents=FlexContainer.from_dict(card)
-            )])
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[FlexMessage(
+                    alt_text="作業列表",
+                    contents=FlexContainer.from_dict(bubble)
+                )]
+            )
         )
 
 def handle_complete_task_direct(user_id, reply_token):
-    from postback_handler import register_postback_handlers  # 防止循環 import
-    event = type("Event", (), {
-        "postback": type("Postback", (), {"data": "complete_task"}),
-        "source": type("Source", (), {"user_id": user_id}),
-        "reply_token": reply_token
-    })
-    register_postback_handlers(lambda _: None).handle_postback(event)
-
-def handle_set_remind_time(user_id, reply_token):
-    now_time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%H:%M")
-
+    """直接處理完成作業的邏輯"""
+    tasks = load_data(user_id)
+    
+    # 過濾出未完成的作業
+    incomplete_tasks = [(i, task) for i, task in enumerate(tasks) if not task.get("done", False)]
+    
+    if not incomplete_tasks:
+        reply = "✅ 目前沒有未完成的作業"
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[TextMessage(text=reply)]
+                )
+            )
+        return
+    
+    # 構建選擇作業的按鈕
+    buttons = []
+    for i, task in incomplete_tasks:
+        buttons.append({
+            "type": "button",
+            "action": {
+                "type": "postback",
+                "label": f"✅ {task['task']}",
+                "data": f"mark_done_{i}"
+            },
+            "style": "primary"
+        })
+    
+    # 如果按鈕太多，只顯示前10個
+    if len(buttons) > 10:
+        buttons = buttons[:10]
+        
     bubble = {
         "type": "bubble",
         "body": {
@@ -566,7 +791,57 @@ def handle_set_remind_time(user_id, reply_token):
             "layout": "vertical",
             "spacing": "md",
             "contents": [
-                {"type": "text", "text": "⏰ 請選擇提醒時間", "weight": "bold", "size": "lg"},
+                {"type": "text", "text": "✅ 選擇要完成的作業", "weight": "bold", "size": "lg"},
+                {"type": "text", "text": f"共有 {len(incomplete_tasks)} 個未完成作業", "size": "sm", "color": "#888888"}
+            ] + buttons
+        }
+    }
+    
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[FlexMessage(
+                    alt_text="選擇要完成的作業",
+                    contents=FlexContainer.from_dict(bubble)
+                )]
+            )
+        )
+
+def handle_set_remind_time(user_id, reply_token):
+    from firebase_utils import get_remind_time  # 需要導入獲取提醒時間的函數
+    
+    now_time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%H:%M")
+    current_remind_time = get_remind_time(user_id)  # 獲取當前設定的提醒時間
+    
+    # 構建卡片內容
+    contents = [
+        {"type": "text", "text": "⏰ 請選擇提醒時間", "weight": "bold", "size": "lg"}
+    ]
+    
+    # 如果有設定提醒時間，顯示當前時間
+    if current_remind_time:
+        contents.append({
+            "type": "text", 
+            "text": f"目前提醒時間：{current_remind_time}", 
+            "size": "sm", 
+            "color": "#666666"
+        })
+    else:
+        contents.append({
+            "type": "text", 
+            "text": "目前尚未設定提醒時間", 
+            "size": "sm", 
+            "color": "#888888"
+        })
+
+    bubble = {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": contents + [
                 {
                     "type": "button",
                     "action": {
@@ -574,7 +849,7 @@ def handle_set_remind_time(user_id, reply_token):
                         "label": "選擇時間",
                         "data": "select_remind_time",
                         "mode": "time",
-                        "initial": now_time,
+                        "initial": current_remind_time if current_remind_time else now_time,
                         "max": "23:59",
                         "min": "00:00"
                     },
@@ -638,7 +913,8 @@ def handle_clear_completed(user_id, reply_token):
                 {
                     "type": "button",
                     "action": {"type": "postback", "label": "⚡ 一鍵清除全部", "data": "clear_completed_all"},
-                    "style": "primary"
+                    "style": "primary",
+                    "color": "#FF3B30"  # ← 紅色
                 }
             ]
         }
@@ -774,7 +1050,8 @@ def handle_clear_expired(user_id, reply_token):
                 {
                     "type": "button",
                     "action": {"type": "postback", "label": "⚡ 一鍵清除全部", "data": "clear_expired_all"},
-                    "style": "primary"
+                    "style": "primary",
+                    "color": "#FF3B30"  # ← 紅色
                 }
             ]
         }
