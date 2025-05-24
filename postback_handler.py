@@ -702,7 +702,7 @@ def handle_view_tasks(user_id, reply_token):
                     {"type": "filler", "flex": 3},
                     {
                         "type": "text",
-                        "text": f"截止日：{due_display}",
+                        "text": f"截止日:{due_display}",
                         "size": "xs",
                         "color": "#FF5551" if is_expired else "#888888",
                         "flex": 3,
