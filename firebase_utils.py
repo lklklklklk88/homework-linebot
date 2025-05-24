@@ -122,22 +122,26 @@ def add_task(user_id, task):
         print(f"新增任務時發生錯誤：{str(e)}")
         return False
     
-def save_remind_time(user_id, remind_time):
-    """
-    儲存使用者提醒時間到 Firebase
-    """
+def get_remind_time(user_id):
+    """獲取用戶的提醒時間"""
     try:
-        ref = db.reference(f"users/{user_id}/settings")
-        ref.update({"remind_time": remind_time})
+        ref = db.reference(f'remind_times/{user_id}')
+        remind_time = ref.get()
+        return remind_time
+    except Exception as e:
+        print(f"獲取提醒時間失敗：{e}")
+        return None
+    
+def save_remind_time(user_id, time_str):
+    """保存用戶的提醒時間"""
+    try:
+        ref = db.reference(f'remind_times/{user_id}')
+        ref.set(time_str)
+        print(f"已保存用戶 {user_id} 的提醒時間：{time_str}")
         return True
     except Exception as e:
-        print(f"儲存提醒時間失敗：{e}")
-        return False
-
-def save_remind_time(user_id, time_string):
-    meta = load_metadata(user_id) or {}
-    meta["remind_time"] = time_string
-    save_metadata(user_id, meta)
+        print(f"保存提醒時間失敗：{e}")
+        raise e
 
 def load_metadata(user_id):
     ref = db.reference(f"users/{user_id}/meta")

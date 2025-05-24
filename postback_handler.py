@@ -170,6 +170,7 @@ def handle_add_task(user_id, reply_token):
     name_history, _, _ = get_task_history(user_id)
 
     buttons = []
+    # 限制只顯示最近3個歷史記錄
     for name in name_history[-3:]:
         buttons.append({
             "type": "button",
@@ -229,6 +230,15 @@ def handle_select_task_name(data, user_id, reply_token):
 
     _, _, time_history = get_task_history(user_id)
 
+    # 構建歷史時間按鈕，限制最近3個
+    history_buttons = []
+    for t in time_history[-3:]:  # 只取最近3個
+        history_buttons.append({
+            "type": "button",
+            "action": {"type": "postback", "label": t, "data": f"select_time_{t.replace('小時', '')}"},
+            "style": "secondary"
+        })
+
     bubble = {
         "type": "bubble",
         "body": {
@@ -237,14 +247,8 @@ def handle_select_task_name(data, user_id, reply_token):
             "spacing": "md",
             "contents": [
                 {"type": "text", "text": "⏰ 請輸入預估完成時間", "weight": "bold", "size": "lg"},
-                {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"}
-            ] + [
-                {
-                    "type": "button",
-                    "action": {"type": "postback", "label": t, "data": f"select_time_{t.replace('小時', '')}"},
-                    "style": "secondary"
-                } for t in time_history
-            ] + [
+                {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
+                *history_buttons,
                 {
                     "type": "button",
                     "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_add_task"},
@@ -273,6 +277,15 @@ def handle_select_time(data, user_id, reply_token):
 
     _, type_history, _ = get_task_history(user_id)
 
+    # 構建歷史類型按鈕，限制最近3個
+    history_buttons = []
+    for t in type_history[-3:]:  # 只取最近3個
+        history_buttons.append({
+            "type": "button",
+            "action": {"type": "postback", "label": t, "data": f"select_type_{t}"},
+            "style": "secondary"
+        })
+
     bubble = {
         "type": "bubble",
         "body": {
@@ -281,14 +294,8 @@ def handle_select_time(data, user_id, reply_token):
             "spacing": "md",
             "contents": [
                 {"type": "text", "text": "📝 請選擇作業類型", "weight": "bold", "size": "lg"},
-                {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"}
-            ] + [
-                {
-                    "type": "button",
-                    "action": {"type": "postback", "label": t, "data": f"select_type_{t}"},
-                    "style": "secondary"
-                } for t in type_history
-            ] + [
+                {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
+                *history_buttons,
                 {
                     "type": "button",
                     "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_add_task"},
@@ -307,6 +314,7 @@ def handle_select_time(data, user_id, reply_token):
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(reply_token=reply_token, messages=messages)
         )
+
 
 def handle_select_type(data, user_id, reply_token):
     type_value = data.replace("select_type_", "")
@@ -777,7 +785,7 @@ def handle_complete_task_direct(user_id, reply_token):
                 "label": f"✅ {task['task']}",
                 "data": f"mark_done_{i}"
             },
-            "style": "primary"
+            "style": "secondary"
         })
     
     # 如果按鈕太多，只顯示前10個
@@ -809,85 +817,112 @@ def handle_complete_task_direct(user_id, reply_token):
         )
 
 def handle_set_remind_time(user_id, reply_token):
-    from firebase_utils import get_remind_time  # 需要導入獲取提醒時間的函數
-    
-    now_time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%H:%M")
-    current_remind_time = get_remind_time(user_id)  # 獲取當前設定的提醒時間
-    
-    # 構建卡片內容
-    contents = [
-        {"type": "text", "text": "⏰ 請選擇提醒時間", "weight": "bold", "size": "lg"}
-    ]
-    
-    # 如果有設定提醒時間，顯示當前時間
-    if current_remind_time:
-        contents.append({
-            "type": "text", 
-            "text": f"目前提醒時間：{current_remind_time}", 
-            "size": "sm", 
-            "color": "#666666"
-        })
-    else:
-        contents.append({
-            "type": "text", 
-            "text": "目前尚未設定提醒時間", 
-            "size": "sm", 
-            "color": "#888888"
-        })
+    try:
+        from firebase_utils import get_remind_time  # 確保導入成功
+        
+        now_time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%H:%M")
+        
+        # 安全地獲取當前提醒時間
+        try:
+            current_remind_time = get_remind_time(user_id)
+        except Exception as e:
+            print(f"獲取提醒時間失敗：{e}")
+            current_remind_time = None
+        
+        # 構建卡片內容
+        contents = [
+            {"type": "text", "text": "⏰ 請選擇提醒時間", "weight": "bold", "size": "lg"}
+        ]
+        
+        # 如果有設定提醒時間，顯示當前時間
+        if current_remind_time:
+            contents.append({
+                "type": "text", 
+                "text": f"目前提醒時間：{current_remind_time}", 
+                "size": "sm", 
+                "color": "#666666"
+            })
+        else:
+            contents.append({
+                "type": "text", 
+                "text": "目前尚未設定提醒時間", 
+                "size": "sm", 
+                "color": "#888888"
+            })
 
-    bubble = {
-        "type": "bubble",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "md",
-            "contents": contents + [
-                {
-                    "type": "button",
-                    "action": {
-                        "type": "datetimepicker",
-                        "label": "選擇時間",
-                        "data": "select_remind_time",
-                        "mode": "time",
-                        "initial": current_remind_time if current_remind_time else now_time,
-                        "max": "23:59",
-                        "min": "00:00"
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": contents + [
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "datetimepicker",
+                            "label": "選擇時間",
+                            "data": "select_remind_time",
+                            "mode": "time",
+                            "initial": current_remind_time if current_remind_time else now_time,
+                            "max": "23:59",
+                            "min": "00:00"
+                        },
+                        "style": "primary"
                     },
-                    "style": "primary"
-                },
-                {
-                    "type": "button",
-                    "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_set_remind"},
-                    "style": "secondary"
-                }
-            ]
+                    {
+                        "type": "button",
+                        "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_set_remind"},
+                        "style": "secondary"
+                    }
+                ]
+            }
         }
-    }
 
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[FlexMessage(
-                    alt_text="設定提醒時間",
-                    contents=FlexContainer.from_dict(bubble)
-                )]
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[FlexMessage(
+                        alt_text="設定提醒時間",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
+                )
             )
-        )
+            
+    except Exception as e:
+        print(f"設定提醒時間功能錯誤：{e}")
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[TextMessage(text="❌ 提醒時間功能發生錯誤，請稍後再試")]
+                )
+            )
+
 
 def handle_select_remind_time(event, user_id, reply_token):
-    time_param = event.postback.params.get("time", "")
-    if not time_param:
-        reply = "❌ 未取得提醒時間，請重新選擇"
-    else:
-        save_remind_time(user_id, time_param)
-        reply = f"⏰ 已設定提醒時間為：{time_param}"
+    try:
+        time_param = event.postback.params.get("time", "")
+        if not time_param:
+            reply = "❌ 未取得提醒時間，請重新選擇"
+        else:
+            # 確保 save_remind_time 函數正常工作
+            try:
+                save_remind_time(user_id, time_param)
+                reply = f"⏰ 已設定提醒時間為：{time_param}"
+            except Exception as e:
+                print(f"保存提醒時間失敗：{e}")
+                reply = "❌ 保存提醒時間失敗，請稍後再試"
+
+    except Exception as e:
+        print(f"選擇提醒時間錯誤：{e}")
+        reply = "❌ 設定提醒時間時發生錯誤"
 
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
         )
-
 def handle_cancel_set_remind(user_id, reply_token):
     reply = "❌ 已取消設定提醒時間"
     with ApiClient(configuration) as api_client:
