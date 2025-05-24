@@ -215,7 +215,7 @@ def make_schedule_carousel(tasks):
                 "layout": "vertical",
                 "contents": [
                     {"type": "text", "text": f"📘 {name}", "weight": "bold", "size": "md", "wrap": True},
-                    {"type": "text", "text": f"📅 截止：{due}", "size": "sm", "color": "#888"}
+                    {"type": "text", "text": f"📅 截止：{due}", "size": "sm", "color": "#888888"}
                 ]
             }
         }
