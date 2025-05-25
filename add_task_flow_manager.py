@@ -46,6 +46,7 @@ class AddTaskFlowManager:
 
     @staticmethod
     def _create_task_name_bubble(name_history):
+        """創建作業名稱輸入卡片（只保留手動輸入＋最近歷史紀錄）"""
         bubble = {
             "type": "bubble",
             "size": "mega",
@@ -85,7 +86,7 @@ class AddTaskFlowManager:
                     },
                     {
                         "type": "text",
-                        "text": "（請直接輸入名稱，支持中英文與 emoji）",
+                        "text": "（可直接輸入，或點選最近使用）",
                         "size": "sm",
                         "color": "#6B7280",
                         "margin": "sm"
@@ -112,6 +113,43 @@ class AddTaskFlowManager:
                 ]
             }
         }
+
+        # 歷史記錄（最多 3 筆）
+        if name_history:
+            history_buttons = []
+            for name in name_history[-3:][::-1]:  # 取最近3筆，最新的排最上
+                history_buttons.append({
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": f"📋 {name}",
+                        "data": f"history_task_{name}"
+                    },
+                    "style": "secondary",
+                    "height": "sm",
+                    "margin": "sm"
+                })
+            bubble["body"]["contents"].extend([
+                {
+                    "type": "separator",
+                    "margin": "lg"
+                },
+                {
+                    "type": "text",
+                    "text": "📋 最近使用",
+                    "size": "sm",
+                    "weight": "bold",
+                    "color": "#4B5563",
+                    "margin": "md"
+                },
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "sm",
+                    "margin": "sm",
+                    "contents": history_buttons
+                }
+            ])
         return bubble
 
     @staticmethod
@@ -224,8 +262,8 @@ class AddTaskFlowManager:
             }
         }
         
-        # 創建時間按鈕（3×2）
-        time_buttons_rows = [[] for _ in range(2)]  # 2 row
+        # 創建時間按鈕（2行3列）
+        time_buttons_rows = [[] for _ in range(2)]  # 2 rows
 
         for i, time_option in enumerate(quick_times):
             is_recommended = time_option["time"] == most_common_time
@@ -241,9 +279,15 @@ class AddTaskFlowManager:
                 "height": "sm",
                 "flex": 1
             }
-            row = i // 3  # 0, 1
+            row = i % 2  # 0,1：先填滿第一行，再第二行
             time_buttons_rows[row].append(button)
 
+        # 補足每行3顆
+        for row in time_buttons_rows:
+            while len(row) < 3:
+                row.append({"type": "filler"})  # 填空
+
+        # 依序加入每行
         for row_buttons in time_buttons_rows:
             bubble["body"]["contents"].append({
                 "type": "box",
@@ -435,9 +479,8 @@ class AddTaskFlowManager:
             }
         }
         
-        # 創建類型按鈕（兩行四列）
-        # 創建類型按鈕（4×2）
-        type_buttons_rows = [[] for _ in range(2)]  # 2 row
+        # 創建類型按鈕（4行2列，直式）
+        type_buttons_rows = [[] for _ in range(4)]  # 4 rows
 
         for i, config in enumerate(type_configs):
             button = {
@@ -452,9 +495,15 @@ class AddTaskFlowManager:
                 "height": "sm",
                 "flex": 1
             }
-            row = i // 4  # 0, 1
+            row = i % 4  # 0~3，先直式一顆、再往下
             type_buttons_rows[row].append(button)
 
+        # 補足每行2顆
+        for row in type_buttons_rows:
+            while len(row) < 2:
+                row.append({"type": "filler"})  # 填空
+
+        # 依序加入每行
         for row_buttons in type_buttons_rows:
             bubble["body"]["contents"].append({
                 "type": "box",
