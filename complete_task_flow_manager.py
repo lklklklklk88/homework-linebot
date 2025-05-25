@@ -789,7 +789,7 @@ class CompleteTaskFlowManager:
         
         # 重新顯示更新後的選擇介面
         tasks = load_data(user_id)
-        incomplete_tasks = [(i, task) for i, task in enumerate(tasks) if not task.get("done", False)]
+        incomplete_tasks = [(i, t) for i, t in enumerate(tasks) if not t.get("done", False)]
         bubble = CompleteTaskFlowManager._create_batch_selection_bubble(incomplete_tasks, user_id)
         
         with ApiClient(configuration) as api_client:
