@@ -500,7 +500,7 @@ def handle_view_tasks(user_id, reply_token):
                 },
                 {
                     "type": "text",
-                    "text": due_display if due_date != "未設定" else "(未設定)",
+                    "text": due_display if due_date != "未設定" else "未設定",
                     "size": "xs",
                     "flex": 1,
                     "align": "center",

@@ -803,8 +803,8 @@ class AddTaskFlowManager:
         if not temp_task:
             AddTaskFlowManager._send_error_and_restart(user_id, reply_token)
             return
-            
-        # 不設定截止日期，直接顯示確認畫面
+        temp_task["due"] = "未設定"
+        set_temp_task(user_id, temp_task)
         AddTaskFlowManager._show_confirmation(user_id, reply_token)
 
     @staticmethod
@@ -1083,7 +1083,11 @@ class AddTaskFlowManager:
                         temp_task["category"], 
                         temp_task["estimated_time"]
                     )
-                    
+
+                    #確保截止日不為空字串/None
+                    if "due" not in temp_task or not temp_task["due"] or temp_task["due"] == "None":
+                        temp_task["due"] = "未設定"
+
                     # 新增作業
                     add_task(user_id, temp_task)
                     
