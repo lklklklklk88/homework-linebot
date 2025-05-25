@@ -945,13 +945,55 @@ class CompleteTaskFlowManager:
                 )
             )
 
-@staticmethod
-def cancel_complete_task(user_id, reply_token):
-    """取消完成作業流程"""
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[TextMessage(text="❌ 已取消完成作業流程")]
+    @staticmethod
+    def cancel_complete_task(user_id, reply_token):
+        """取消完成作業流程"""
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[TextMessage(text="❌ 已取消完成作業流程")]
+                )
             )
-        )
+
+# ==================== 處理器函數 ====================
+
+def handle_complete_task(user_id, reply_token):
+    """完成作業 - 統一入口"""
+    CompleteTaskFlowManager.start_complete_task_flow(user_id, reply_token)
+
+def handle_confirm_complete(data, user_id, reply_token):
+    """處理確認完成單一作業"""
+    try:
+        task_index = int(data.replace("confirm_complete_", ""))
+        CompleteTaskFlowManager.handle_confirm_complete(user_id, task_index, reply_token)
+    except ValueError:
+        CompleteTaskFlowManager._send_error(reply_token)
+
+def handle_execute_complete(data, user_id, reply_token):
+    """執行完成作業"""
+    try:
+        task_index = int(data.replace("execute_complete_", ""))
+        CompleteTaskFlowManager.execute_complete_task(user_id, task_index, reply_token)
+    except ValueError:
+        CompleteTaskFlowManager._send_error(reply_token)
+
+def handle_batch_complete_tasks(user_id, reply_token):
+    """處理批次完成作業"""
+    CompleteTaskFlowManager.handle_batch_complete(user_id, reply_token)
+
+def handle_toggle_batch(data, user_id, reply_token):
+    """處理批次選擇切換"""
+    try:
+        task_index = int(data.replace("toggle_batch_", ""))
+        CompleteTaskFlowManager.handle_toggle_batch_selection(user_id, task_index, reply_token)
+    except ValueError:
+        CompleteTaskFlowManager._send_error(reply_token)
+
+def handle_execute_batch_complete(user_id, reply_token):
+    """執行批次完成"""
+    CompleteTaskFlowManager.execute_batch_complete(user_id, reply_token)
+
+def handle_cancel_complete_task(user_id, reply_token):
+    """取消完成作業"""
+    CompleteTaskFlowManager.cancel_complete_task(user_id, reply_token)
