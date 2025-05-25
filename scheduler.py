@@ -1,5 +1,17 @@
-from line_utils import get_line_display_name
+import os
+import time
 import datetime
+
+from line_utils import get_line_display_name
+from firebase_utils import (
+    get_add_task_remind_enabled,
+    get_add_task_remind_time,
+    get_last_add_task_date,
+    get_all_user_ids
+)
+from linebot.v3.messaging import MessagingApi, Configuration, TextMessage
+from linebot.v3.messaging import ApiClient
+
 
 # 表情符號對應表
 EMOJI_MAP = {
@@ -13,6 +25,31 @@ EMOJI_MAP = {
     'exercise': '🏃',
     'meeting': '👥'
 }
+
+configuration = Configuration(access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
+
+def send_add_task_reminders():
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+    today = now.strftime("%Y-%m-%d")
+    current_time = now.strftime("%H:%M")
+
+    users = get_all_user_ids()
+
+    for user_id in users:
+        try:
+            if get_add_task_remind_enabled(user_id):
+                remind_time = get_add_task_remind_time(user_id)
+                if remind_time == current_time:
+                    last_added = get_last_add_task_date(user_id)
+                    if last_added != today:
+                        print(f"[提醒] 提醒 {user_id} 新增作業")
+                        with ApiClient(configuration) as api_client:
+                            MessagingApi(api_client).push_message(
+                                to=user_id,
+                                messages=[TextMessage(text="📝 記得今天要新增作業唷～")]
+                            )
+        except Exception as e:
+            print(f"[錯誤] 處理 {user_id} 時出錯：{e}")
 
 def get_rounded_start_time(minutes_ahead=30):
     """
@@ -130,3 +167,10 @@ def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
 請確保回覆格式正確，這樣我才能正確解析排程內容。"""
 
     return prompt
+
+
+if __name__ == "__main__":
+    print("🟢 新增作業提醒排程已啟動，每分鐘執行一次")
+    while True:
+        send_add_task_reminders()
+        time.sleep(60)

@@ -309,3 +309,12 @@ def batch_complete_tasks(user_id, task_indices):
     except Exception as e:
         print(f"批次完成作業失敗：{e}")
         return False, 0
+    
+def get_all_user_ids():
+    ref = db.reference("users")
+    users = ref.get()
+    return list(users.keys()) if users else []
+
+def get_last_add_task_date(user_id):
+    ref = db.reference(f"users/{user_id}/last_add_task_date")
+    return ref.get()
