@@ -613,12 +613,12 @@ def make_optimized_schedule_card(blocks, total_hours, available_hours, pending_t
                 {
                     "type": "box",
                     "layout": "vertical",
-                    "width": "80px",
+                    "flex": 1,  # 改為 flex: 1 讓時間佔一半
                     "contents": [
                         {
                             "type": "text",
                             "text": time_range,
-                            "size": "xs",
+                            "size": "sm",  # 改為 sm 讓字體稍大
                             "color": "#666666",
                             "weight": "bold",
                             "align": "center"
@@ -626,9 +626,13 @@ def make_optimized_schedule_card(blocks, total_hours, available_hours, pending_t
                     ]
                 },
                 {
+                    "type": "separator",
+                    "color": "#EEEEEE"
+                },
+                {
                     "type": "box",
                     "layout": "vertical",
-                    "flex": 1,
+                    "flex": 1,  # 作業部分也佔一半
                     "contents": [
                         {
                             "type": "box",
@@ -643,7 +647,8 @@ def make_optimized_schedule_card(blocks, total_hours, available_hours, pending_t
                                     "size": "sm",
                                     "color": text_color,
                                     "weight": "bold",
-                                    "wrap": True
+                                    "wrap": True,
+                                    "align": "center"  # 新增置中對齊
                                 }
                             ]
                         }
@@ -742,13 +747,51 @@ def make_optimized_schedule_card(blocks, total_hours, available_hours, pending_t
                     "type": "separator",
                     "margin": "lg"
                 },
-                # 時間軸
+                # 時間軸標題
                 {
-                    "type": "text",
-                    "text": "⏰ 時間安排",
-                    "size": "md",
-                    "weight": "bold",
-                    "color": "#333333"
+                    "type": "box",
+                    "layout": "horizontal",
+                    "spacing": "md",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "vertical",
+                            "flex": 1,
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "⏰ 時間安排",
+                                    "size": "md",
+                                    "weight": "bold",
+                                    "color": "#333333",
+                                    "align": "center"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "separator",
+                            "color": "#FFFFFF"  # 透明分隔線
+                        },
+                        {
+                            "type": "box",
+                            "layout": "vertical",
+                            "flex": 1,
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "📚 作業項目",
+                                    "size": "md",
+                                    "weight": "bold",
+                                    "color": "#333333",
+                                    "align": "center"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "type": "separator",
+                    "margin": "sm"
                 },
                 {
                     "type": "box",
