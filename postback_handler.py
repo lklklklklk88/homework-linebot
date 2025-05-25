@@ -325,27 +325,14 @@ def handle_execute_complete(data, user_id, reply_token):
             )
 
 def handle_toggle_batch(data, user_id, reply_token):
+    """處理 toggle 選項，委託給流程管理器統一處理邏輯（切換選擇 + 更新畫面）"""
     try:
         task_index = int(data.replace("toggle_batch_", ""))
-        from firebase_utils import toggle_batch_selection
-        from complete_task_flow_manager import CompleteTaskFlowManager
-
-        toggle_batch_selection(user_id, task_index)
-        tasks = load_data(user_id)
-        bubble = CompleteTaskFlowManager._create_batch_selection_bubble(tasks, user_id)
-
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(
-                    reply_token=reply_token,
-                    messages=[FlexMessage(
-                        alt_text="已更新批次選取",
-                        contents=FlexContainer.from_dict(bubble)
-                    )]
-                )
-            )
+        CompleteTaskFlowManager.handle_toggle_batch_selection(user_id, task_index, reply_token)
     except Exception as e:
         print(f"批次選擇錯誤：{e}")
+        CompleteTaskFlowManager._send_error(reply_token)
+
 
 def handle_execute_batch_complete(user_id, reply_token):
     CompleteTaskFlowManager.execute_batch_complete(user_id, reply_token)
@@ -363,6 +350,48 @@ def handle_show_schedule(user_id, reply_token):
                 messages=response if isinstance(response, list) else [TextMessage(text=response)]
             )
         )
+
+# ==================== 處理器函數 ====================
+
+def handle_complete_task(user_id, reply_token):
+    """完成作業 - 統一入口"""
+    CompleteTaskFlowManager.start_complete_task_flow(user_id, reply_token)
+
+def handle_confirm_complete(data, user_id, reply_token):
+    """處理確認完成單一作業"""
+    try:
+        task_index = int(data.replace("confirm_complete_", ""))
+        CompleteTaskFlowManager.handle_confirm_complete(user_id, task_index, reply_token)
+    except ValueError:
+        CompleteTaskFlowManager._send_error(reply_token)
+
+def handle_execute_complete(data, user_id, reply_token):
+    """執行完成作業"""
+    try:
+        task_index = int(data.replace("execute_complete_", ""))
+        CompleteTaskFlowManager.execute_complete_task(user_id, task_index, reply_token)
+    except ValueError:
+        CompleteTaskFlowManager._send_error(reply_token)
+
+def handle_batch_complete_tasks(user_id, reply_token):
+    """處理批次完成作業"""
+    CompleteTaskFlowManager.handle_batch_complete(user_id, reply_token)
+
+def handle_toggle_batch(data, user_id, reply_token):
+    """處理批次選擇切換"""
+    try:
+        task_index = int(data.replace("toggle_batch_", ""))
+        CompleteTaskFlowManager.handle_toggle_batch_selection(user_id, task_index, reply_token)
+    except ValueError:
+        CompleteTaskFlowManager._send_error(reply_token)
+
+def handle_execute_batch_complete(user_id, reply_token):
+    """執行批次完成"""
+    CompleteTaskFlowManager.execute_batch_complete(user_id, reply_token)
+
+def handle_cancel_complete_task(user_id, reply_token):
+    """取消完成作業"""
+    CompleteTaskFlowManager.cancel_complete_task(user_id, reply_token)
 
 def handle_view_tasks(user_id, reply_token):
     """顯示作業列表為一頁式表格"""
