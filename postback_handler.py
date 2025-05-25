@@ -419,9 +419,10 @@ def handle_view_tasks(user_id, reply_token):
         "spacing": "sm",
         "margin": "md",
         "contents": [
-            {"type": "text", "text": "作業名稱", "size": "sm", "weight": "bold", "flex": 3},
-            {"type": "text", "text": "類型", "size": "sm", "weight": "bold", "flex": 2, "align": "center"},
+            {"type": "text", "text": "作業名稱", "size": "sm", "weight": "bold", "flex": 2},
+            {"type": "text", "text": "類型", "size": "sm", "weight": "bold", "flex": 1, "align": "center"},
             {"type": "text", "text": "時間", "size": "sm", "weight": "bold", "flex": 1, "align": "center"},
+            {"type": "text", "text": "截止日", "size": "sm", "weight": "bold", "flex": 1, "align": "center"},
             {"type": "text", "text": "狀態", "size": "sm", "weight": "bold", "flex": 1, "align": "center"}
         ]
     }
@@ -462,7 +463,9 @@ def handle_view_tasks(user_id, reply_token):
                 due_datetime = datetime.datetime.strptime(due_date, "%Y-%m-%d")
                 due_display = due_datetime.strftime("%m/%d")
             except:
-                pass
+                due_display = "(未設定)"   # 解析失敗也給未設定
+        else:
+            due_display = "(未設定)"
         
         # 創建作業行
         task_row = {
@@ -475,7 +478,7 @@ def handle_view_tasks(user_id, reply_token):
                     "type": "text",
                     "text": task.get("task", "未命名"),
                     "size": "sm",
-                    "flex": 3,
+                    "flex": 2,
                     "wrap": True,
                     "color": "#666666" if is_done else "#333333"
                 },
@@ -483,7 +486,7 @@ def handle_view_tasks(user_id, reply_token):
                     "type": "text",
                     "text": task.get("category", "-"),
                     "size": "xs",
-                    "flex": 2,
+                    "flex": 1,
                     "align": "center",
                     "color": "#888888"
                 },
@@ -497,6 +500,14 @@ def handle_view_tasks(user_id, reply_token):
                 },
                 {
                     "type": "text",
+                    "text": due_display if due_date != "未設定" else "(未設定)",
+                    "size": "xs",
+                    "flex": 1,
+                    "align": "center",
+                    "color": "#FF5551" if is_expired else "#888888"
+                },
+                {
+                    "type": "text",
                     "text": status_text,
                     "size": "sm",
                     "flex": 1,
@@ -507,27 +518,6 @@ def handle_view_tasks(user_id, reply_token):
         }
         
         table_contents.append(task_row)
-        
-        # 如果有截止日期，在下方顯示
-        if due_date != "未設定":
-            due_row = {
-                "type": "box",
-                "layout": "horizontal",
-                "spacing": "sm",
-                "contents": [
-                    {"type": "filler", "flex": 3},
-                    {
-                        "type": "text",
-                        "text": f"截止日:{due_display}",
-                        "size": "xs",
-                        "color": "#FF5551" if is_expired else "#888888",
-                        "flex": 3,
-                        "align": "end"
-                    }
-                ]
-            }
-            table_contents.append(due_row)
-        
         # 添加分隔線（除了最後一個）
         if i < len(tasks) - 1:
             table_contents.append({"type": "separator", "margin": "sm", "color": "#EEEEEE"})
