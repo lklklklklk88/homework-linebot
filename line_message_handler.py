@@ -1,6 +1,8 @@
 import os
 import datetime
 import re
+
+from add_task_flow_manager import AddTaskFlowManager
 from firebase_utils import (
     load_data, save_data, set_user_state, get_user_state,
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task,
@@ -31,122 +33,18 @@ from linebot.v3.messaging.models import TextMessage, FlexMessage, FlexContainer
 
 configuration = Configuration(access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
 
-# === ➊ 處理「手寫作業名稱」 ================================
+# 更新訊息處理器中的狀態處理函數
 def handle_task_name_input(user_id: str, text: str, reply_token: str):
-    """
-    使用者輸入作業名稱 → 儲存暫存資料 → 切換 state → 推送「請輸入預估時間」卡片
-    """
-    temp_task = {"task": text}
-    set_temp_task(user_id, temp_task)
-    set_user_state(user_id, "awaiting_task_time")
+    """使用新的統一處理"""
+    AddTaskFlowManager.handle_manual_task_name_input(user_id, text, reply_token)
 
-    # 讀取時間歷史（最多 3 筆）
-    _, _, time_history = get_task_history(user_id)
-    buttons = [{
-        "type": "button",
-        "action": {"type": "postback", "label": t, "data": f"select_time_{t.replace('小時', '')}"},
-        "style": "secondary"
-    } for t in time_history[-3:]]
-
-    bubble = make_time_history_bubble(time_history)
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[
-                    FlexMessage(alt_text="請輸入預估完成時間",
-                                contents=FlexContainer.from_dict(bubble)),
-                    TextMessage(text="請輸入預估完成時間（小時）：")
-                ]
-            )
-        )
-
-# === ➋ 處理「手寫預估時間」 ================================
 def handle_estimated_time_input(user_id: str, text: str, reply_token: str):
-    """使用者輸入預估時間"""
-    try:
-        hours = _parse_hours(text.strip())
-    except ValueError:
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(
-                    reply_token=reply_token,
-                    messages=[
-                        TextMessage(text="⚠️ 請輸入有效的時間，例如 2、2.5、2小時、兩小時")
-                    ]
-                )
-            )
-        return
+    """使用新的統一處理"""
+    AddTaskFlowManager.handle_manual_time_input(user_id, text, reply_token)
 
-    temp_task = get_temp_task(user_id) or {}
-    temp_task["estimated_time"] = hours
-    set_temp_task(user_id, temp_task)
-    set_user_state(user_id, "awaiting_task_type")
-
-    # 使用增強版類型選擇介面
-    _, type_history, _ = get_task_history(user_id)
-    from flex_utils import make_enhanced_type_bubble
-    bubble = make_enhanced_type_bubble(type_history)
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[
-                    FlexMessage(alt_text="選擇作業類型",
-                                contents=FlexContainer.from_dict(bubble))
-                ]
-            )
-        )
-
-# === ➌ 處理「手寫作業類型」 ================================
 def handle_task_type_input(user_id: str, text: str, reply_token: str):
-    """
-    使用者輸入作業類型 → 更新 temp_task → 切到選截止日期 state → 推送日期選擇器
-    """
-    temp_task = get_temp_task(user_id) or {}
-    temp_task["category"] = text.strip()
-    set_temp_task(user_id, temp_task)
-    set_user_state(user_id, "awaiting_task_due")
-
-    today = datetime.datetime.now(
-        datetime.timezone(datetime.timedelta(hours=8))
-    ).strftime("%Y-%m-%d")
-
-    bubble = {
-        "type": "bubble",
-        "body": {
-            "type": "box", "layout": "vertical", "spacing": "md",
-            "contents": [
-                {"type": "text", "text": "📅 請選擇截止日期", "weight": "bold", "size": "md"},
-                {"type": "button",
-                 "action": {"type": "datetimepicker", "label": "📅 選擇日期",
-                            "data": "select_task_due", "mode": "date",
-                            "initial": today, "max": "2099-12-31", "min": today},
-                 "style": "primary"},
-                {"type": "button",
-                 "action": {"type": "postback", "label": "❌ 不設定截止日期", "data": "no_due_date"},
-                 "style": "secondary"},
-                {"type": "button",
-                 "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_add_task"},
-                 "style": "secondary"}
-            ]
-        }
-    }
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[
-                    FlexMessage(
-                        alt_text="請選擇截止日期",
-                        contents=FlexContainer.from_dict(bubble)
-                    )
-                ]
-            )
-        )
+    """使用新的統一處理"""
+    AddTaskFlowManager.handle_manual_type_input(user_id, text, reply_token)
 
 def register_message_handlers(handler):
     @handler.add(MessageEvent)

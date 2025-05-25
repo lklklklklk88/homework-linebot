@@ -1,6 +1,8 @@
 import os
 import datetime
 import logging
+
+from add_task_flow_manager import AddTaskFlowManager
 from firebase_utils import (
     load_data, save_data, set_user_state,
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task,
@@ -58,14 +60,15 @@ def register_postback_handlers(handler):
     }
 
     PREFIX_HANDLERS = {
-        "select_task_name_": handle_select_task_name,
+        "quick_task_": handle_quick_task,           # 新增：快速選擇作業
+        "history_task_": handle_history_task,      # 新增：歷史作業選擇
+        "select_task_name_": handle_select_task_name,  # 保持兼容
         "select_time_": handle_select_time,
         "select_type_": handle_select_type,
+        "quick_due_": handle_quick_due,             # 新增：快速截止日期
         "delete_completed_": handle_delete_completed,
         "delete_expired_": handle_delete_expired,
         "mark_done_": handle_mark_done,
-        "quick_task_": handle_quick_task,
-        "quick_due_": handle_quick_due,
     }
 
     # 需要特殊處理的 postback（需要完整 event 物件）
@@ -123,524 +126,62 @@ def register_postback_handlers(handler):
                 )
 
 def handle_add_task(user_id, reply_token):
-    set_user_state(user_id, "awaiting_task_name")
-    clear_temp_task(user_id)
-    name_history, _, _ = get_task_history(user_id)
-    
-    # 歷史記錄按鈕
-    history_buttons = []
-    for name in name_history[-3:]:
-        history_buttons.append({
-            "type": "button",
-            "action": {
-                "type": "postback",
-                "label": f"📝 {name}",
-                "data": f"select_task_name_{name}"
-            },
-            "style": "secondary"
-        })
-
-    bubble = {
-        "type": "bubble",
-        "size": "mega",
-        "header": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-                {
-                    "type": "text",
-                    "text": "✨ 新增作業",
-                    "color": "#FFFFFF",
-                    "size": "xl",
-                    "weight": "bold"
-                }
-            ],
-            "backgroundColor": "#6366F1",
-            "paddingAll": "20px"
-        },
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "lg",
-            "contents": [
-                {
-                    "type": "text",
-                    "text": "請輸入作業名稱",
-                    "size": "md",
-                    "weight": "bold",
-                    "color": "#1F2937"
-                }
-            ]
-        }
-    }
-    
-    # 如果有歷史記錄，加入歷史記錄區塊
-    if history_buttons:
-        bubble["body"]["contents"].append({
-            "type": "text",
-            "text": "或從最近使用中選擇：",
-            "size": "sm",
-            "color": "#6B7280",
-            "margin": "sm"
-        })
-        bubble["body"]["contents"].append({
-            "type": "separator",
-            "margin": "lg"
-        })
-        bubble["body"]["contents"].append({
-            "type": "text",
-            "text": "📋 最近使用",
-            "size": "sm",
-            "weight": "bold",
-            "color": "#4B5563",
-            "margin": "lg"
-        })
-        bubble["body"]["contents"].append({
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "sm",
-            "margin": "sm",
-            "contents": history_buttons
-        })
-    
-    # Footer 加入取消按鈕
-    bubble["footer"] = {
-        "type": "box",
-        "layout": "vertical",
-        "contents": [
-            {
-                "type": "button",
-                "action": {
-                    "type": "postback",
-                    "label": "❌ 取消",
-                    "data": "cancel_add_task"
-                },
-                "style": "secondary"
-            }
-        ]
-    }
-
-    messages = [
-        FlexMessage(
-            alt_text="新增作業",
-            contents=FlexContainer.from_dict(bubble)
-        ),
-        TextMessage(text="💡 提示：直接輸入作業名稱，或點選上方按鈕")
-    ]
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=messages
-            )
-        )
+    """使用新的統一流程"""
+    AddTaskFlowManager.start_add_task_flow(user_id, reply_token)
 
 def handle_select_task_name(data, user_id, reply_token):
+    """保持兼容性的作業名稱選擇"""
     task_name = data.replace("select_task_name_", "")
-    temp_task = {"task": task_name}
-    set_temp_task(user_id, temp_task)
-    set_user_state(user_id, "awaiting_task_time")
-
-    _, _, time_history = get_task_history(user_id)
-
-    # 構建歷史時間按鈕，限制最近3個
-    history_buttons = []
-    for t in time_history[-3:]:  # 只取最近3個
-        history_buttons.append({
-            "type": "button",
-            "action": {"type": "postback", "label": t, "data": f"select_time_{t.replace('小時', '')}"},
-            "style": "secondary"
-        })
-
-    bubble = {
-        "type": "bubble",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "md",
-            "contents": [
-                {"type": "text", "text": "⏰ 請輸入預估完成時間", "weight": "bold", "size": "lg"},
-                {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
-                *history_buttons,
-                {
-                    "type": "button",
-                    "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_add_task"},
-                    "style": "secondary"
-                }
-            ]
-        }
-    }
-
-    messages = [
-        FlexMessage(alt_text="請輸入預估完成時間", contents=FlexContainer.from_dict(bubble)),
-        TextMessage(text="請輸入預估完成時間（小時）：")
-    ]
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(reply_token=reply_token, messages=messages)
-        )
+    AddTaskFlowManager.handle_task_name_selection(user_id, task_name, reply_token)
 
 def handle_select_time(data, user_id, reply_token):
+    """更新時間選擇邏輯"""
     time_value = data.replace("select_time_", "")
-    temp_task = get_temp_task(user_id)
-    temp_task["estimated_time"] = float(time_value)
-    set_temp_task(user_id, temp_task)
-    set_user_state(user_id, "awaiting_task_type")
-
-    _, type_history, _ = get_task_history(user_id)
-
-    # 構建歷史類型按鈕，限制最近3個
-    history_buttons = []
-    for t in type_history[-3:]:  # 只取最近3個
-        history_buttons.append({
-            "type": "button",
-            "action": {"type": "postback", "label": t, "data": f"select_type_{t}"},
-            "style": "secondary"
-        })
-
-    bubble = {
-        "type": "bubble",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "md",
-            "contents": [
-                {"type": "text", "text": "📝 請選擇作業類型", "weight": "bold", "size": "lg"},
-                {"type": "text", "text": "或選擇歷史記錄：", "size": "sm", "color": "#888888"},
-                *history_buttons,
-                {
-                    "type": "button",
-                    "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_add_task"},
-                    "style": "secondary"
-                }
-            ]
-        }
-    }
-
-    messages = [
-        FlexMessage(alt_text="請選擇作業類型", contents=FlexContainer.from_dict(bubble)),
-        TextMessage(text="請輸入作業類型：")
-    ]
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(reply_token=reply_token, messages=messages)
-        )
-
+    AddTaskFlowManager.handle_time_selection(user_id, time_value, reply_token)
 
 def handle_select_type(data, user_id, reply_token):
+    """更新類型選擇邏輯"""
     type_value = data.replace("select_type_", "")
-    temp_task = get_temp_task(user_id)
-    temp_task["category"] = type_value
-    set_temp_task(user_id, temp_task)
-    set_user_state(user_id, "awaiting_task_due")
+    AddTaskFlowManager.handle_type_selection(user_id, type_value, reply_token)
 
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-    today = now.strftime("%Y-%m-%d")
-    tomorrow = (now + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
-    next_week = (now + datetime.timedelta(days=7)).strftime("%Y-%m-%d")
-
-    bubble = {
-        "type": "bubble",
-        "size": "mega",
-        "header": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-                {
-                    "type": "text",
-                    "text": "📅 截止日期",
-                    "color": "#FFFFFF",
-                    "size": "lg",
-                    "weight": "bold"
-                }
-            ],
-            "backgroundColor": "#F97316",
-            "paddingAll": "15px"
-        },
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "md",
-            "contents": [
-                {
-                    "type": "text",
-                    "text": "請選擇截止日期",
-                    "size": "md",
-                    "weight": "bold",
-                    "color": "#1F2937"
-                },
-                {
-                    "type": "separator",
-                    "margin": "lg"
-                },
-                {
-                    "type": "text",
-                    "text": "⚡ 快速選擇",
-                    "size": "sm",
-                    "weight": "bold",
-                    "color": "#4B5563"
-                },
-                {
-                    "type": "box",
-                    "layout": "vertical",
-                    "spacing": "sm",
-                    "margin": "sm",
-                    "contents": [
-                        {
-                            "type": "button",
-                            "action": {
-                                "type": "postback",
-                                "label": "📌 今天",
-                                "data": f"quick_due_{today}"
-                            },
-                            "style": "secondary",
-                            "color": "#DC2626"
-                        },
-                        {
-                            "type": "button",
-                            "action": {
-                                "type": "postback",
-                                "label": "📍 明天",
-                                "data": f"quick_due_{tomorrow}"
-                            },
-                            "style": "secondary",
-                            "color": "#F59E0B"
-                        },
-                        {
-                            "type": "button",
-                            "action": {
-                                "type": "postback",
-                                "label": "📎 一週後",
-                                "data": f"quick_due_{next_week}"
-                            },
-                            "style": "secondary",
-                            "color": "#3B82F6"
-                        }
-                    ]
-                },
-                {
-                    "type": "separator",
-                    "margin": "lg"
-                },
-                {
-                    "type": "button",
-                    "action": {
-                        "type": "datetimepicker",
-                        "label": "📅 選擇其他日期",
-                        "data": "select_task_due",
-                        "mode": "date",
-                        "initial": today,
-                        "max": "2099-12-31",
-                        "min": today
-                    },
-                    "style": "primary"
-                },
-                {
-                    "type": "button",
-                    "action": {
-                        "type": "postback",
-                        "label": "🚫 不設定截止日期",
-                        "data": "no_due_date"
-                    },
-                    "style": "secondary"
-                }
-            ]
-        },
-        "footer": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-                {
-                    "type": "button",
-                    "action": {
-                        "type": "postback",
-                        "label": "❌ 取消",
-                        "data": "cancel_add_task"
-                    },
-                    "style": "secondary"
-                }
-            ]
-        }
-    }
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(reply_token=reply_token, messages=[
-                FlexMessage(alt_text="選擇截止日期", contents=FlexContainer.from_dict(bubble))
-            ])
-        )
+def handle_quick_due(data, user_id, reply_token):
+    """新增：處理快速截止日期選擇"""
+    due_date = data.replace("quick_due_", "")
+    AddTaskFlowManager.handle_due_date_selection(user_id, due_date, reply_token)
 
 def handle_no_due_date(user_id, reply_token):
-    temp_task = get_temp_task(user_id)
-    if not temp_task:
-        clear_temp_task(user_id)
-        clear_user_state(user_id)
-        reply = "❌ 發生錯誤，請重新開始新增作業流程"
-    else:
-        reply_bubble = {
-            "type": "bubble",
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "spacing": "md",
-                "contents": [
-                    {"type": "text", "text": "📝 確認新增作業", "weight": "bold", "size": "lg"},
-                    {"type": "text", "text": f"作業名稱：{temp_task.get('task', '未設定')}", "size": "md"},
-                    {"type": "text", "text": f"預估時間：{temp_task.get('estimated_time', 0)} 小時", "size": "md"},
-                    {"type": "text", "text": f"作業類型：{temp_task.get('category', '未設定')}", "size": "md"},
-                    {"type": "text", "text": "截止日期：未設定", "size": "md"}
-                ]
-            },
-            "footer": {
-                "type": "box",
-                "layout": "horizontal",
-                "spacing": "sm",
-                "contents": [
-                    {
-                        "type": "button",
-                        "action": {"type": "postback", "label": "✅ 確認新增", "data": "confirm_add_task"},
-                        "style": "primary"
-                    },
-                    {
-                        "type": "button",
-                        "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_add_task"},
-                        "style": "secondary"
-                    }
-                ]
-            }
-        }
+    """更新不設定截止日期處理"""
+    AddTaskFlowManager.handle_no_due_date(user_id, reply_token)
 
+def handle_select_task_due(event, user_id):
+    """更新日期選擇器處理"""
+    date = event.postback.params.get("date", "")
+    reply_token = event.reply_token
+    
+    if date:
+        AddTaskFlowManager.handle_due_date_selection(user_id, date, reply_token)
+    else:
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
                 ReplyMessageRequest(
                     reply_token=reply_token,
-                    messages=[FlexMessage(alt_text="確認新增作業", contents=FlexContainer.from_dict(reply_bubble))]
+                    messages=[TextMessage(text="❌ 沒有取得日期，請重新選擇")]
                 )
             )
-        return
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
-        )
-
-def handle_select_task_due(event, user_id):
-    date = event.postback.params.get("date", "")
-    reply_token = event.reply_token
-
-    if not date:
-        reply = "❌ 沒有取得日期，請重新選擇"
-    else:
-        temp_task = get_temp_task(user_id)
-        if not temp_task:
-            clear_temp_task(user_id)
-            clear_user_state(user_id)
-            reply = "❌ 發生錯誤，請重新開始新增作業流程"
-        else:
-            temp_task["due"] = date
-            set_temp_task(user_id, temp_task)
-
-            reply_bubble = {
-                "type": "bubble",
-                "body": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "spacing": "md",
-                    "contents": [
-                        {"type": "text", "text": "📝 確認新增作業", "weight": "bold", "size": "lg"},
-                        {"type": "text", "text": f"作業名稱：{temp_task.get('task', '未設定')}", "size": "md"},
-                        {"type": "text", "text": f"預估時間：{temp_task.get('estimated_time', 0)} 小時", "size": "md"},
-                        {"type": "text", "text": f"作業類型：{temp_task.get('category', '未設定')}", "size": "md"},
-                        {"type": "text", "text": f"截止日期：{temp_task.get('due', '未設定')}", "size": "md"}
-                    ]
-                },
-                "footer": {
-                    "type": "box",
-                    "layout": "horizontal",
-                    "spacing": "sm",
-                    "contents": [
-                        {
-                            "type": "button",
-                            "action": {"type": "postback", "label": "✅ 確認新增", "data": "confirm_add_task"},
-                            "style": "primary"
-                        },
-                        {
-                            "type": "button",
-                            "action": {"type": "postback", "label": "❌ 取消", "data": "cancel_add_task"},
-                            "style": "secondary"
-                        }
-                    ]
-                }
-            }
-
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(
-                    ReplyMessageRequest(
-                        reply_token=reply_token,
-                        messages=[FlexMessage(alt_text="確認新增作業", contents=FlexContainer.from_dict(reply_bubble))]
-                    )
-                )
-            return
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[TextMessage(text=reply)]
-            )
-        )
 
 def handle_confirm_add_task(user_id, reply_token):
-    temp_task = get_temp_task(user_id)
-    if not temp_task:
-        reply = "⚠️ 發生錯誤，請重新開始新增作業流程"
-    else:
-        try:
-            required_fields = ["task", "estimated_time", "category"]
-            if any(f not in temp_task or temp_task[f] is None for f in required_fields):
-                reply = "⚠️ 缺少必要資訊，請重新開始新增作業流程"
-            else:
-                if isinstance(temp_task["estimated_time"], str):
-                    temp_task["estimated_time"] = float(temp_task["estimated_time"])
-
-                update_task_history(user_id, temp_task["task"], temp_task["category"], temp_task["estimated_time"])
-                add_task(user_id, temp_task)
-                clear_temp_task(user_id)
-                clear_user_state(user_id)
-                reply = "✅ 作業已成功新增！"
-        except Exception as e:
-            print(f"新增作業失敗：{e}")
-            reply = "❌ 發生錯誤，請稍後再試"
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
-        )
+    """更新確認新增處理"""
+    AddTaskFlowManager.confirm_add_task(user_id, reply_token)
 
 def handle_quick_task(data, user_id, reply_token):
     """處理快速選擇作業名稱"""
     task_name = data.replace("quick_task_", "")
-    temp_task = {"task": task_name}
-    set_temp_task(user_id, temp_task)
-    set_user_state(user_id, "awaiting_task_time")
-    
-    # 使用增強版時間選擇介面
-    _, _, time_history = get_task_history(user_id)
-    from flex_utils import make_enhanced_time_bubble
-    bubble = make_enhanced_time_bubble(time_history, user_id)
-    
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[
-                    FlexMessage(alt_text="選擇預估時間", contents=FlexContainer.from_dict(bubble))
-                ]
-            )
-        )
+    AddTaskFlowManager.handle_task_name_selection(user_id, task_name, reply_token, is_quick=True)
+
+def handle_history_task(data, user_id, reply_token):
+    """處理歷史作業名稱選擇"""
+    task_name = data.replace("history_task_", "")
+    AddTaskFlowManager.handle_task_name_selection(user_id, task_name, reply_token)
 
 def handle_quick_due(data, user_id, reply_token):
     """處理快速選擇截止日期"""
@@ -740,12 +281,8 @@ def handle_quick_due(data, user_id, reply_token):
         )
 
 def handle_cancel_add_task(user_id, reply_token):
-    clear_temp_task(user_id)
-    clear_user_state(user_id)
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text="❌ 已取消新增作業")])
-        )
+    """更新取消處理"""
+    AddTaskFlowManager.cancel_add_task(user_id, reply_token)
 
 def handle_show_schedule(user_id, reply_token):
     from line_message_handler import get_today_schedule_for_user  # 避免 import 循環
