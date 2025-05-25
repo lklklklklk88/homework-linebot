@@ -17,10 +17,6 @@ from postback_handler import (
     handle_clear_completed,
     handle_clear_expired
 )
-from flex_utils import (
-    make_time_history_bubble,
-    make_type_history_bubble,
-)
 from task_parser import parse_task_from_text
 from intent_utils import classify_intent_by_gemini
 from flex_utils import make_schedule_carousel, extract_schedule_blocks, make_timetable_card, make_weekly_progress_card
