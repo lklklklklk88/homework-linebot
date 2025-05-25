@@ -704,14 +704,14 @@ class CompleteTaskFlowManager:
         }
         
         # 創建選擇框列表
-        for i, (index, task) in enumerate(incomplete_tasks[:15]):  # 最多顯示15個
+        for index, task in incomplete_tasks[:15]:  # 最多顯示15個
             task_name = task.get("task", "未命名")
             if len(task_name) > 20:
                 task_name = task_name[:19] + "..."
             
             # 檢查是否已選中
             is_selected = index in selected_indices
-            checkbox_icon = "☑" if is_selected else "☐"
+            checkbox_icon = "✅" if is_selected else "◻️"
             button_color = "#10B981" if is_selected else None
             
             checkbox = {
@@ -754,16 +754,6 @@ class CompleteTaskFlowManager:
                     "style": "primary",
                     "color": "#10B981",
                     "flex": 2
-                },
-                {
-                    "type": "button",
-                    "action": {
-                        "type": "postback",
-                        "label": "✅ 完成選取項目",
-                        "data": "execute_batch_complete"
-                    },
-                    "style": "primary",
-                    "color": "#10B981"
                 },
                 {
                     "type": "button",
