@@ -65,6 +65,7 @@ def register_postback_handlers(handler):
         "batch_complete_tasks": lambda u, r: CompleteTaskFlowManager.handle_batch_complete(u, r),
         "cancel_complete_task": lambda u, r: CompleteTaskFlowManager.cancel_complete_task(u, r),
         "execute_batch_complete": lambda u, r: handle_execute_batch_complete(u, r),
+        "cancel_schedule": handle_cancel_schedule,
     }
 
     SPECIAL_HANDLERS = {
@@ -85,6 +86,7 @@ def register_postback_handlers(handler):
         "confirm_complete_": lambda d, u, r: handle_confirm_complete(d, u, r),
         "execute_complete_": lambda d, u, r: handle_execute_complete(d, u, r),
         "toggle_batch_": lambda d, u, r: handle_toggle_batch(d, u, r),
+        "schedule_hours_": handle_schedule_hours,
     }
 
     @handler.add(PostbackEvent)
@@ -339,15 +341,125 @@ def handle_execute_batch_complete(user_id, reply_token):
 
 
 def handle_show_schedule(user_id, reply_token):
-    from line_message_handler import get_today_schedule_for_user  # 避免 import 循環
-
-    response = get_today_schedule_for_user(user_id)
-
+    """開始排程流程 - 先詢問剩餘時間"""
+    
+    # 設定使用者狀態為等待輸入剩餘時間
+    set_user_state(user_id, "awaiting_available_hours")
+    
+    # 快速時間選項
+    quick_hours_options = ["2小時", "3小時", "4小時", "5小時", "6小時", "7小時", "8小時"]
+    hour_buttons = []
+    
+    for hours in quick_hours_options:
+        hour_buttons.append({
+            "type": "button",
+            "action": {
+                "type": "postback",
+                "label": f"⏰ {hours}",
+                "data": f"schedule_hours_{hours.replace('小時', '')}"
+            },
+            "style": "secondary",
+            "color": "#4A90E2"
+        })
+    
+    bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "📅 安排今日排程",
+                    "color": "#FFFFFF",
+                    "size": "xl",
+                    "weight": "bold"
+                }
+            ],
+            "backgroundColor": "#FF6B6B",
+            "paddingAll": "20px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "lg",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "您今天還有多少時間可以安排作業？",
+                    "size": "md",
+                    "weight": "bold",
+                    "color": "#333333"
+                },
+                {
+                    "type": "text",
+                    "text": "💡 我會根據您的時間和作業優先順序，為您安排最佳的學習計畫",
+                    "size": "sm",
+                    "color": "#666666",
+                    "wrap": True,
+                    "margin": "sm"
+                },
+                {
+                    "type": "separator",
+                    "margin": "lg"
+                },
+                {
+                    "type": "text",
+                    "text": "⚡ 快速選擇",
+                    "size": "sm",
+                    "weight": "bold",
+                    "color": "#4B5563"
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "spacing": "sm",
+                    "margin": "sm",
+                    "contents": hour_buttons[:4]  # 第一行顯示4個
+                },
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "spacing": "sm",
+                    "margin": "sm",
+                    "contents": hour_buttons[4:]  # 第二行顯示剩餘的
+                },
+                {
+                    "type": "text",
+                    "text": "或直接輸入時數（例如：4.5）",
+                    "size": "xs",
+                    "color": "#888888",
+                    "margin": "lg",
+                    "align": "center"
+                }
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "❌ 取消",
+                        "data": "cancel_schedule"
+                    },
+                    "style": "secondary"
+                }
+            ]
+        }
+    }
+    
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(
                 reply_token=reply_token,
-                messages=response if isinstance(response, list) else [TextMessage(text=response)]
+                messages=[FlexMessage(
+                    alt_text="設定可用時間",
+                    contents=FlexContainer.from_dict(bubble)
+                )]
             )
         )
 
@@ -1422,4 +1534,35 @@ def handle_select_add_task_remind_time(event, user_id, reply_token):
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
+        )
+
+def handle_schedule_hours(data, user_id, reply_token):
+    """處理快速選擇的時數"""
+    hours = float(data.replace("schedule_hours_", ""))
+    
+    # 清除狀態
+    clear_user_state(user_id)
+    
+    # 生成排程
+    from line_message_handler import generate_schedule_for_user
+    response = generate_schedule_for_user(user_id, hours)
+    
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=response if isinstance(response, list) else [TextMessage(text=response)]
+            )
+        )
+
+def handle_cancel_schedule(user_id, reply_token):
+    """取消排程設定"""
+    clear_user_state(user_id)
+    
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[TextMessage(text="❌ 已取消排程設定")]
+            )
         )

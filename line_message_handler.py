@@ -19,10 +19,10 @@ from postback_handler import (
 )
 from task_parser import parse_task_from_text
 from intent_utils import classify_intent_by_gemini, parse_task_info_from_text
-from flex_utils import make_schedule_carousel, extract_schedule_blocks, make_timetable_card, make_weekly_progress_card
+from flex_utils import make_optimized_schedule_card, extract_schedule_blocks, make_timetable_card, make_weekly_progress_card
 from firebase_admin import db
 from gemini_client import call_gemini_schedule
-from scheduler import generate_schedule_prompt
+from scheduler import generate_optimized_schedule_prompt
 from linebot.v3.webhook import MessageEvent
 from linebot.v3.messaging import MessagingApi, ReplyMessageRequest, ApiClient, Configuration
 from linebot.v3.messaging.models import TextMessage, FlexMessage, FlexContainer
@@ -64,6 +64,9 @@ def register_message_handlers(handler):
             return
         elif state == "awaiting_task_type":
             handle_task_type_input(user_id, text, event.reply_token)
+            return
+        elif state == "awaiting_available_hours":
+            handle_available_hours_input(user_id, text, event.reply_token)
             return
         # ===============================================
     
@@ -195,39 +198,73 @@ def register_message_handlers(handler):
                     )
                 )
 
-def get_today_schedule_for_user(user_id):
-    """
-    獲取用戶今日排程
-    """
+def generate_schedule_for_user(user_id, available_hours):
+    """根據使用者可用時間生成優化的排程"""
     try:
         tasks = load_data(user_id)
-        habits = {
-            "prefered_morning": "閱讀、寫作",
-            "prefered_afternoon": "計算、邏輯"
-        }
+        
+        # 過濾出未完成的作業
+        pending_tasks = [t for t in tasks if not t.get("done", False)]
+        
+        if not pending_tasks:
+            return [TextMessage(text="😊 太棒了！您目前沒有待完成的作業。\n好好享受您的空閒時間吧！")]
+        
+        # 根據截止日期和優先級排序
+        now_date = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
+        
+        def task_priority(task):
+            due = task.get("due", "未設定")
+            if due == "未設定":
+                return 999  # 沒有截止日期的優先級最低
+            try:
+                due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
+                days_until_due = (due_date - now_date).days
+                return days_until_due
+            except:
+                return 999
+        
+        pending_tasks.sort(key=task_priority)
+        
+        # 獲取使用者習慣（可以從歷史資料分析）
+        habits = analyze_user_habits(user_id)
+        
         today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
-        available_hours = 5
-
-        prompt = generate_schedule_prompt(user_id, tasks, habits, today, available_hours)
+        
+        # 生成排程提示詞
+        prompt = generate_optimized_schedule_prompt(user_id, pending_tasks, habits, today, available_hours)
         raw_text = call_gemini_schedule(prompt)
-
+        
+        # 解析回應
         explanation, schedule_text, total_hours = parse_schedule_response(raw_text)
         blocks = extract_schedule_blocks(schedule_text)
-        timetable_card = make_timetable_card(blocks, total_hours)
+        
+        # 創建優化的排程卡片
+        schedule_card = make_optimized_schedule_card(blocks, total_hours, available_hours, pending_tasks)
         
         messages = []
         if explanation:
             messages.append(TextMessage(text=explanation))
-        if timetable_card:
+        if schedule_card:
             messages.append(FlexMessage(
-                alt_text="📅 今日排程",
-                contents=FlexContainer.from_dict(timetable_card)
+                alt_text="📅 今日最佳排程",
+                contents=FlexContainer.from_dict(schedule_card)
             ))
         
-        return messages if messages else "抱歉，無法生成排程，請稍後再試。"
+        return messages if messages else [TextMessage(text="抱歉，無法生成排程，請稍後再試。")]
+        
     except Exception as e:
         print(f"生成排程時發生錯誤：{str(e)}")
-        return "抱歉，生成排程時發生錯誤，請稍後再試。"
+        return [TextMessage(text="抱歉，生成排程時發生錯誤，請稍後再試。")]
+
+def analyze_user_habits(user_id):
+    """分析使用者習慣（可以根據歷史資料）"""
+    # 這裡可以擴展為真實的習慣分析
+    return {
+        "preferred_morning": "閱讀、寫作、需要高專注的任務",
+        "preferred_afternoon": "計算、程式設計",
+        "preferred_evening": "複習、整理筆記",
+        "break_frequency": "每90分鐘休息15分鐘"
+    }
 
 def get_weekly_progress_for_user(user_id):
     """
@@ -351,3 +388,34 @@ def _parse_hours(raw: str) -> float:
 
     # 仍然失敗就拋例外
     raise ValueError(f"無法解析時間：{raw}")
+
+def handle_available_hours_input(user_id: str, text: str, reply_token: str):
+    """處理使用者輸入的可用時數"""
+    try:
+        # 嘗試解析數字
+        hours = float(text.strip())
+        
+        if hours <= 0 or hours > 24:
+            raise ValueError("時數必須在 0-24 之間")
+        
+        # 清除狀態
+        clear_user_state(user_id)
+        
+        # 生成排程
+        response = generate_schedule_for_user(user_id, hours)
+        
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=response if isinstance(response, list) else [TextMessage(text=response)]
+                )
+            )
+    except ValueError:
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[TextMessage(text="❌ 請輸入有效的時數（例如：4 或 4.5）")]
+                )
+            )

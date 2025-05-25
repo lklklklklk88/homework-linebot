@@ -572,3 +572,245 @@ def make_weekly_progress_card(completed_tasks, total_hours, avg_hours_per_day):
         }
     }
     return bubble
+
+def make_optimized_schedule_card(blocks, total_hours, available_hours, pending_tasks):
+    """製作優化的排程卡片"""
+    if not blocks:
+        return None
+    
+    # 計算完成率
+    scheduled_task_count = len([b for b in blocks if b['task'] not in ['短暫休息', '午餐', '晚餐']])
+    completion_rate = min(100, int((scheduled_task_count / len(pending_tasks)) * 100))
+    
+    # 時間利用率
+    utilization_rate = min(100, int((total_hours / available_hours) * 100))
+    
+    # 建立時間軸視覺化
+    timeline_contents = []
+    for i, block in enumerate(blocks):
+        time_range = f"{block['start']} - {block['end']}"
+        emoji = block.get('emoji', '📌')
+        task_name = block['task']
+        category = block.get('category', '')
+        
+        # 判斷任務類型的顏色
+        if '休息' in task_name or '午餐' in task_name:
+            bg_color = "#E8F5E9"
+            text_color = "#4CAF50"
+        elif category == "緊急":
+            bg_color = "#FFEBEE"
+            text_color = "#F44336"
+        else:
+            bg_color = "#E3F2FD"
+            text_color = "#2196F3"
+        
+        timeline_contents.append({
+            "type": "box",
+            "layout": "horizontal",
+            "spacing": "md",
+            "margin": "md" if i > 0 else "none",
+            "contents": [
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "width": "80px",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": time_range,
+                            "size": "xs",
+                            "color": "#666666",
+                            "weight": "bold",
+                            "align": "center"
+                        }
+                    ]
+                },
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "flex": 1,
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "backgroundColor": bg_color,
+                            "cornerRadius": "8px",
+                            "paddingAll": "10px",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": f"{emoji} {task_name}",
+                                    "size": "sm",
+                                    "color": text_color,
+                                    "weight": "bold",
+                                    "wrap": True
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        })
+    
+    bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "📅 今日最佳排程",
+                    "color": "#FFFFFF",
+                    "size": "xl",
+                    "weight": "bold"
+                },
+                {
+                    "type": "text",
+                    "text": f"為您安排了 {total_hours} 小時的學習計畫",
+                    "color": "#FFFFFF",
+                    "size": "sm",
+                    "margin": "sm"
+                }
+            ],
+            "backgroundColor": "#FF6B6B",
+            "paddingAll": "20px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "lg",
+            "contents": [
+                # 統計資訊
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "spacing": "md",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "vertical",
+                            "flex": 1,
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": f"{utilization_rate}%",
+                                    "size": "xl",
+                                    "weight": "bold",
+                                    "align": "center",
+                                    "color": "#FF6B6B"
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "時間利用率",
+                                    "size": "xs",
+                                    "color": "#666666",
+                                    "align": "center"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "separator",
+                            "color": "#EEEEEE"
+                        },
+                        {
+                            "type": "box",
+                            "layout": "vertical",
+                            "flex": 1,
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": f"{scheduled_task_count}/{len(pending_tasks)}",
+                                    "size": "xl",
+                                    "weight": "bold",
+                                    "align": "center",
+                                    "color": "#4CAF50"
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "任務安排",
+                                    "size": "xs",
+                                    "color": "#666666",
+                                    "align": "center"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "type": "separator",
+                    "margin": "lg"
+                },
+                # 時間軸
+                {
+                    "type": "text",
+                    "text": "⏰ 時間安排",
+                    "size": "md",
+                    "weight": "bold",
+                    "color": "#333333"
+                },
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "contents": timeline_contents
+                }
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "📋 查看作業列表",
+                        "data": "view_tasks"
+                    },
+                    "style": "primary",
+                    "color": "#FF6B6B"
+                },
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "⏰ 重新安排時間",
+                        "data": "show_schedule"
+                    },
+                    "style": "secondary"
+                }
+            ]
+        }
+    }
+    
+    # 如果有未安排的任務，添加提醒
+    if scheduled_task_count < len(pending_tasks):
+        bubble["body"]["contents"].append({
+            "type": "box",
+            "layout": "vertical",
+            "margin": "lg",
+            "backgroundColor": "#FFF9C4",
+            "cornerRadius": "8px",
+            "paddingAll": "10px",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": f"💡 還有 {len(pending_tasks) - scheduled_task_count} 個任務未安排",
+                    "size": "sm",
+                    "color": "#F57C00",
+                    "wrap": True
+                },
+                {
+                    "type": "text",
+                    "text": "建議增加可用時間或延後部分任務",
+                    "size": "xs",
+                    "color": "#666666",
+                    "margin": "sm",
+                    "wrap": True
+                }
+            ]
+        })
+    
+    return bubble
