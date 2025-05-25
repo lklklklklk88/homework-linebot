@@ -3,7 +3,16 @@ import datetime
 import logging
 
 from add_task_flow_manager import AddTaskFlowManager
-from complete_task_flow_manager import CompleteTaskFlowManager
+from complete_task_flow_manager import (
+    CompleteTaskFlowManager,
+    handle_complete_task,
+    handle_confirm_complete,
+    handle_execute_complete,
+    handle_batch_complete_tasks,
+    handle_toggle_batch,
+    handle_execute_batch_complete,
+    handle_cancel_complete_task as handle_cancel_complete_task_new
+)
 
 from firebase_utils import (
     load_data, save_data, set_user_state,

@@ -632,11 +632,15 @@ class CompleteTaskFlowManager:
             CompleteTaskFlowManager._send_no_tasks_message(reply_token)
             return
         
+        # 清除之前的選擇
+        from firebase_utils import clear_batch_selection
+        clear_batch_selection(user_id)
+        
         # 設定用戶狀態
         set_user_state(user_id, "batch_selecting_tasks")
         
         # 創建批次選擇介面
-        bubble = CompleteTaskFlowManager._create_batch_selection_bubble(incomplete_tasks)
+        bubble = CompleteTaskFlowManager._create_batch_selection_bubble(incomplete_tasks, user_id)
         
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
@@ -652,8 +656,12 @@ class CompleteTaskFlowManager:
             )
 
     @staticmethod
-    def _create_batch_selection_bubble(incomplete_tasks):
+    def _create_batch_selection_bubble(incomplete_tasks, user_id):
         """創建批次選擇作業的卡片"""
+        # 獲取當前選中的項目
+        from firebase_utils import get_batch_selection
+        selected_indices = get_batch_selection(user_id)
+        
         bubble = {
             "type": "bubble",
             "size": "mega",
@@ -670,7 +678,7 @@ class CompleteTaskFlowManager:
                     },
                     {
                         "type": "text",
-                        "text": "選擇多個作業一次完成",
+                        "text": f"已選擇 {len(selected_indices)} 項",
                         "color": "#FFFFFF",
                         "size": "sm",
                         "margin": "sm"
@@ -701,6 +709,11 @@ class CompleteTaskFlowManager:
             if len(task_name) > 20:
                 task_name = task_name[:19] + "..."
             
+            # 檢查是否已選中
+            is_selected = index in selected_indices
+            checkbox_icon = "☑" if is_selected else "☐"
+            button_color = "#10B981" if is_selected else None
+            
             checkbox = {
                 "type": "box",
                 "layout": "horizontal",
@@ -711,7 +724,7 @@ class CompleteTaskFlowManager:
                         "type": "button",
                         "action": {
                             "type": "postback",
-                            "label": f"☐ {task_name}",
+                            "label": f"{checkbox_icon} {task_name}",
                             "data": f"toggle_batch_{index}"
                         },
                         "style": "secondary",
@@ -719,6 +732,9 @@ class CompleteTaskFlowManager:
                     }
                 ]
             }
+            
+            if button_color:
+                checkbox["contents"][0]["color"] = button_color
             
             bubble["body"]["contents"].append(checkbox)
         
@@ -732,7 +748,7 @@ class CompleteTaskFlowManager:
                     "type": "button",
                     "action": {
                         "type": "postback",
-                        "label": "✅ 完成選中項目",
+                        "label": f"✅ 完成選中項目 ({len(selected_indices)})",
                         "data": "execute_batch_complete"
                     },
                     "style": "primary",
@@ -752,18 +768,158 @@ class CompleteTaskFlowManager:
             ]
         }
         
+        # 如果沒有選中任何項目，禁用完成按鈕
+        if len(selected_indices) == 0:
+            bubble["footer"]["contents"][0]["style"] = "secondary"
+            bubble["footer"]["contents"][0]["color"] = "#9CA3AF"
+        
         return bubble
 
     @staticmethod
-    def cancel_complete_task(user_id, reply_token):
-        """取消完成作業"""
-        clear_user_state(user_id)
+    def handle_toggle_batch_selection(user_id, task_index, reply_token):
+        """處理批次選擇的切換"""
+        from firebase_utils import toggle_batch_selection, load_data
+        
+        # 切換選擇狀態
+        success, action, total_selected = toggle_batch_selection(user_id, task_index)
+        
+        if not success:
+            CompleteTaskFlowManager._send_error(reply_token)
+            return
+        
+        # 重新顯示更新後的選擇介面
+        tasks = load_data(user_id)
+        incomplete_tasks = [(i, task) for i, task in enumerate(tasks) if not task.get("done", False)]
+        bubble = CompleteTaskFlowManager._create_batch_selection_bubble(incomplete_tasks, user_id)
         
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
                 ReplyMessageRequest(
                     reply_token=reply_token,
-                    messages=[TextMessage(text="❌ 已取消完成作業")]
+                    messages=[
+                        FlexMessage(
+                            alt_text="批次完成作業",
+                            contents=FlexContainer.from_dict(bubble)
+                        )
+                    ]
+                )
+            )
+
+    @staticmethod
+    def execute_batch_complete(user_id, reply_token):
+        """執行批次完成作業"""
+        from firebase_utils import get_batch_selection, batch_complete_tasks, get_batch_selected_tasks
+        
+        # 獲取選中的作業
+        selected_tasks = get_batch_selected_tasks(user_id)
+        
+        if not selected_tasks:
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=reply_token,
+                        messages=[TextMessage(text="⚠️ 請先選擇要完成的作業")]
+                    )
+                )
+            return
+        
+        # 執行批次完成
+        selected_indices = [item["index"] for item in selected_tasks]
+        success, completed_count = batch_complete_tasks(user_id, selected_indices)
+        
+        if not success:
+            CompleteTaskFlowManager._send_error(reply_token)
+            return
+        
+        # 清除用戶狀態
+        clear_user_state(user_id)
+        
+        # 創建成功訊息
+        CompleteTaskFlowManager._send_batch_success_message(user_id, completed_count, reply_token)
+
+    @staticmethod
+    def _send_batch_success_message(user_id, completed_count, reply_token):
+        """發送批次完成成功的訊息"""
+        tasks = load_data(user_id)
+        remaining_tasks = [t for t in tasks if not t.get("done", False)]
+        
+        bubble = {
+            "type": "bubble",
+            "size": "kilo",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "🎉 批次完成成功！",
+                        "size": "xl",
+                        "weight": "bold",
+                        "color": "#10B981",
+                        "align": "center"
+                    },
+                    {
+                        "type": "text",
+                        "text": f"已完成 {completed_count} 項作業",
+                        "size": "lg",
+                        "align": "center",
+                        "margin": "md"
+                    },
+                    {
+                        "type": "separator",
+                        "margin": "lg"
+                    },
+                    {
+                        "type": "text",
+                        "text": f"剩餘 {len(remaining_tasks)} 項作業待完成",
+                        "size": "sm",
+                        "color": "#6B7280",
+                        "align": "center",
+                        "margin": "md"
+                    }
+                ]
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": []
+            }
+        }
+        
+        if remaining_tasks:
+            bubble["footer"]["contents"].append({
+                "type": "button",
+                "action": {
+                    "type": "postback",
+                    "label": "✅ 繼續完成其他作業",
+                    "data": "complete_task"
+                },
+                "style": "primary",
+                "color": "#10B981"
+            })
+        
+        bubble["footer"]["contents"].append({
+            "type": "button",
+            "action": {
+                "type": "postback",
+                "label": "📋 查看所有作業",
+                "data": "view_tasks"
+            },
+            "style": "secondary"
+        })
+        
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[
+                        FlexMessage(
+                            alt_text="批次完成成功",
+                            contents=FlexContainer.from_dict(bubble)
+                        )
+                    ]
                 )
             )
 
@@ -815,6 +971,18 @@ def handle_execute_complete(data, user_id, reply_token):
 def handle_batch_complete_tasks(user_id, reply_token):
     """處理批次完成作業"""
     CompleteTaskFlowManager.handle_batch_complete(user_id, reply_token)
+
+def handle_toggle_batch(data, user_id, reply_token):
+    """處理批次選擇切換"""
+    try:
+        task_index = int(data.replace("toggle_batch_", ""))
+        CompleteTaskFlowManager.handle_toggle_batch_selection(user_id, task_index, reply_token)
+    except ValueError:
+        CompleteTaskFlowManager._send_error(reply_token)
+
+def handle_execute_batch_complete(user_id, reply_token):
+    """執行批次完成"""
+    CompleteTaskFlowManager.execute_batch_complete(user_id, reply_token)
 
 def handle_cancel_complete_task(user_id, reply_token):
     """取消完成作業"""

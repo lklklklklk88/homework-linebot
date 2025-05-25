@@ -3,6 +3,7 @@ import datetime
 import re
 
 from add_task_flow_manager import AddTaskFlowManager
+from complete_task_flow_manager import CompleteTaskFlowManager
 from firebase_utils import (
     load_data, save_data, set_user_state, get_user_state,
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task,
@@ -11,7 +12,6 @@ from firebase_utils import (
 from postback_handler import (
     handle_add_task,
     handle_show_schedule,
-    handle_complete_task_direct,
     handle_view_tasks,
     handle_set_remind_time,
     handle_clear_completed,
@@ -79,7 +79,7 @@ def register_message_handlers(handler):
                 handle_view_tasks(user_id, event.reply_token)
                 return
             elif intent == "complete_task":
-                handle_complete_task_direct(user_id, event.reply_token)
+                CompleteTaskFlowManager.start_complete_task_flow(user_id, event.reply_token)
                 return
             elif intent == "set_reminder":
                 handle_set_remind_time(user_id, event.reply_token)

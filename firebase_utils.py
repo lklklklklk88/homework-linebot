@@ -204,3 +204,108 @@ def save_add_task_remind_enabled(user_id, enabled):
     except Exception as e:
         print(f"儲存新增作業提醒狀態失敗：{e}")
         return False
+    
+def get_batch_selection(user_id):
+    """
+    獲取用戶批次選擇的作業索引列表
+    返回: list of int - 被選中的作業索引
+    """
+    try:
+        ref = db.reference(f"users/{user_id}/batch_selection")
+        selection = ref.get()
+        return selection if selection else []
+    except Exception as e:
+        print(f"獲取批次選擇失敗：{e}")
+        return []
+
+def toggle_batch_selection(user_id, task_index):
+    """
+    切換某個作業的選擇狀態
+    如果已選中則取消，如果未選中則選中
+    """
+    try:
+        selection = get_batch_selection(user_id)
+        
+        if task_index in selection:
+            # 已選中，移除
+            selection.remove(task_index)
+            action = "取消選擇"
+        else:
+            # 未選中，添加
+            selection.append(task_index)
+            action = "選擇"
+        
+        # 儲存更新後的選擇
+        db.reference(f"users/{user_id}/batch_selection").set(selection)
+        return True, action, len(selection)
+        
+    except Exception as e:
+        print(f"切換批次選擇失敗：{e}")
+        return False, "", 0
+
+def clear_batch_selection(user_id):
+    """
+    清除所有批次選擇
+    通常在完成批次操作或取消時調用
+    """
+    try:
+        db.reference(f"users/{user_id}/batch_selection").delete()
+        return True
+    except Exception as e:
+        print(f"清除批次選擇失敗：{e}")
+        return False
+
+def get_batch_selected_tasks(user_id):
+    """
+    獲取所有被選中的作業詳細資訊
+    返回: list of dict - 被選中的作業資料
+    """
+    try:
+        selection = get_batch_selection(user_id)
+        if not selection:
+            return []
+        
+        tasks = load_data(user_id)
+        selected_tasks = []
+        
+        for index in selection:
+            if 0 <= index < len(tasks):
+                selected_tasks.append({
+                    "index": index,
+                    "task": tasks[index]
+                })
+        
+        return selected_tasks
+        
+    except Exception as e:
+        print(f"獲取批次選擇的作業失敗：{e}")
+        return []
+
+def batch_complete_tasks(user_id, task_indices):
+    """
+    批次完成多個作業
+    """
+    try:
+        tasks = load_data(user_id)
+        completed_count = 0
+        
+        # 標記所有選中的作業為完成
+        for index in task_indices:
+            if 0 <= index < len(tasks) and not tasks[index].get("done", False):
+                tasks[index]["done"] = True
+                tasks[index]["completed_at"] = datetime.datetime.now(
+                    datetime.timezone(datetime.timedelta(hours=8))
+                ).strftime("%Y-%m-%d %H:%M:%S")
+                completed_count += 1
+        
+        # 儲存更新後的作業列表
+        save_data(user_id, tasks)
+        
+        # 清除批次選擇
+        clear_batch_selection(user_id)
+        
+        return True, completed_count
+        
+    except Exception as e:
+        print(f"批次完成作業失敗：{e}")
+        return False, 0
