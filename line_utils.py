@@ -167,3 +167,18 @@ def parse_complete_task_from_text(text: str, tasks: list) -> dict:
                 
         print(f"[錯誤] 解析完成作業失敗：{response}")
         return None
+    
+def get_line_display_name(event):
+    """
+    從 LINE webhook event 取出使用者的顯示名稱。
+    注意：需要用 LINE 的 API 取 user profile，event 只會有 user_id。
+    """
+    user_id = event.source.user_id
+    # 這裡需用 MessagingApi 去查 profile，這是範例：
+    from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
+    import os
+
+    configuration = Configuration(access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
+    with ApiClient(configuration) as api_client:
+        profile = MessagingApi(api_client).get_profile(user_id)
+        return profile.display_name
