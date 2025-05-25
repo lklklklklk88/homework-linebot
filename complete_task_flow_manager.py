@@ -759,6 +759,16 @@ class CompleteTaskFlowManager:
                     "type": "button",
                     "action": {
                         "type": "postback",
+                        "label": "✅ 完成選取項目",
+                        "data": "execute_batch_complete"
+                    },
+                    "style": "primary",
+                    "color": "#10B981"
+                },
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
                         "label": "❌ 取消",
                         "data": "cancel_complete_task"
                     },

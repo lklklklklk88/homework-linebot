@@ -64,6 +64,7 @@ def register_postback_handlers(handler):
         "complete_task": lambda u, r: CompleteTaskFlowManager.start_complete_task_flow(u, r),
         "batch_complete_tasks": lambda u, r: CompleteTaskFlowManager.handle_batch_complete(u, r),
         "cancel_complete_task": lambda u, r: CompleteTaskFlowManager.cancel_complete_task(u, r),
+        "execute_batch_complete": lambda u, r: handle_execute_batch_complete(u, r),
     }
 
     SPECIAL_HANDLERS = {
@@ -84,12 +85,6 @@ def register_postback_handlers(handler):
         "confirm_complete_": lambda d, u, r: handle_confirm_complete(d, u, r),
         "execute_complete_": lambda d, u, r: handle_execute_complete(d, u, r),
         "toggle_batch_": lambda d, u, r: handle_toggle_batch(d, u, r),
-    }
-
-    # 需要特殊處理的 postback（需要完整 event 物件）
-    SPECIAL_HANDLERS = {
-        "select_task_due": lambda e, u, r: handle_select_task_due(e, u),
-        "select_remind_time": lambda e, u, r: handle_select_remind_time(e, u, r),
     }
 
     @handler.add(PostbackEvent)
@@ -330,21 +325,31 @@ def handle_execute_complete(data, user_id, reply_token):
             )
 
 def handle_toggle_batch(data, user_id, reply_token):
-    """處理批次選擇切換"""
     try:
         task_index = int(data.replace("toggle_batch_", ""))
-        # 這裡需要實作批次選擇的邏輯
-        # 可以在 Firebase 中維護一個選中項目的列表
-        # 暫時回應確認訊息
+        from firebase_utils import toggle_batch_selection
+        from complete_task_flow_manager import CompleteTaskFlowManager
+
+        toggle_batch_selection(user_id, task_index)
+        tasks = load_data(user_id)
+        bubble = CompleteTaskFlowManager._create_batch_selection_bubble(tasks, user_id)
+
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
                 ReplyMessageRequest(
                     reply_token=reply_token,
-                    messages=[TextMessage(text="✅ 已選擇/取消選擇")]
+                    messages=[FlexMessage(
+                        alt_text="已更新批次選取",
+                        contents=FlexContainer.from_dict(bubble)
+                    )]
                 )
             )
-    except ValueError:
-        print(f"無效的作業索引：{data}")
+    except Exception as e:
+        print(f"批次選擇錯誤：{e}")
+
+def handle_execute_batch_complete(user_id, reply_token):
+    CompleteTaskFlowManager.execute_batch_complete(user_id, reply_token)
+
 
 def handle_show_schedule(user_id, reply_token):
     from line_message_handler import get_today_schedule_for_user  # 避免 import 循環
