@@ -1,7 +1,9 @@
-from gemini_client import call_gemini_schedule
 import json
 import re
+import os
 import datetime
+from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
+from gemini_client import call_gemini_schedule
 
 def classify_intent_by_gemini(text: str) -> str:
     """
@@ -175,8 +177,6 @@ def get_line_display_name(event):
     """
     user_id = event.source.user_id
     # 這裡需用 MessagingApi 去查 profile，這是範例：
-    from linebot.v3.messaging import MessagingApi, Configuration, ApiClient
-    import os
 
     configuration = Configuration(access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
     with ApiClient(configuration) as api_client:
