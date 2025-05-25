@@ -262,8 +262,8 @@ class AddTaskFlowManager:
             }
         }
         
-        # 創建時間按鈕（2行3列）
-        time_buttons_rows = [[] for _ in range(2)]  # 2 rows
+        # 創建時間按鈕（3行2列）
+        time_buttons_rows = [[] for _ in range(3)]  # 3 rows
 
         for i, time_option in enumerate(quick_times):
             is_recommended = time_option["time"] == most_common_time
@@ -279,15 +279,15 @@ class AddTaskFlowManager:
                 "height": "sm",
                 "flex": 1
             }
-            row = i % 2  # 0,1：先填滿第一行，再第二行
+            row = i // 2  # 每2顆一排，共3排
             time_buttons_rows[row].append(button)
 
-        # 補足每行3顆
+        # 補滿每行2顆
         for row in time_buttons_rows:
-            while len(row) < 3:
-                row.append({"type": "filler"})  # 填空
+            while len(row) < 2:
+                row.append({"type": "filler"})  # 填空讓每行對齊
 
-        # 依序加入每行
+        # 依序加進 bubble
         for row_buttons in time_buttons_rows:
             bubble["body"]["contents"].append({
                 "type": "box",
