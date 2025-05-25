@@ -333,3 +333,12 @@ def get_task_remind_enabled(user_id):
     except Exception as e:
         print(f"獲取未完成作業提醒狀態失敗：{e}")
         return True
+
+def save_task_remind_enabled(user_id, enabled):
+    """儲存是否啟用未完成作業提醒"""
+    try:
+        db.reference(f"users/{user_id}/task_remind_enabled").set(enabled)
+        return True
+    except Exception as e:
+        print(f"儲存未完成作業提醒狀態失敗：{e}")
+        return False

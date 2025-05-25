@@ -1076,7 +1076,7 @@ def handle_set_remind_time(user_id, reply_token):
                                 "type": "button",
                                 "action": {
                                     "type": "postback",
-                                    "label": "📋 未完成作業提醒",
+                                    "label": "📋 設定未完成作業提醒",
                                     "data": "set_task_remind"
                                 },
                                 "style": "secondary",
@@ -1086,7 +1086,7 @@ def handle_set_remind_time(user_id, reply_token):
                                 "type": "button",
                                 "action": {
                                     "type": "postback",
-                                    "label": "📝 新增作業提醒",
+                                    "label": "📝 設定每日新增作業提醒",
                                     "data": "set_add_task_remind"
                                 },
                                 "style": "secondary",
@@ -1108,7 +1108,7 @@ def handle_set_remind_time(user_id, reply_token):
                             },
                             {
                                 "type": "text",
-                                "text": "• 未完成作業提醒：每天提醒您待辦的作業",
+                                "text": "• 設定未完成作業提醒：每天提醒您待辦的作業",
                                 "size": "xs",
                                 "color": "#888888",
                                 "wrap": True,
@@ -1116,7 +1116,7 @@ def handle_set_remind_time(user_id, reply_token):
                             },
                             {
                                 "type": "text",
-                                "text": "• 新增作業提醒：提醒您今天記錄作業",
+                                "text": "• 設定每日新增作業提醒：提醒您今天記錄作業",
                                 "size": "xs",
                                 "color": "#888888",
                                 "wrap": True,
