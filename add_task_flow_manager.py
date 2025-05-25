@@ -75,18 +75,27 @@ class AddTaskFlowManager:
             "body": {
                 "type": "box",
                 "layout": "vertical",
-                "spacing": "none",
+                "spacing": "lg",
                 "contents": [
                     {
-                        "type": "separator",
-                        "margin": "none"
+                        "type": "text",
+                        "text": "請輸入作業名稱",
+                        "size": "md",
+                        "weight": "bold",
+                        "color": "#1F2937"
+                    },
+                    {
+                        "type": "text",
+                        "text": "（可直接輸入，或點選最近使用）",
+                        "size": "sm",
+                        "color": "#6B7280",
+                        "margin": "sm"
                     }
                 ]
             },
             "footer": {
                 "type": "box",
                 "layout": "vertical",
-                "spacing": "sm",
                 "contents": [
                     {
                         "type": "text",
