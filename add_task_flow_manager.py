@@ -46,17 +46,6 @@ class AddTaskFlowManager:
 
     @staticmethod
     def _create_task_name_bubble(name_history):
-        """創建作業名稱輸入卡片"""
-        # 常見作業類型快速選項
-        common_tasks = [
-            {"name": "數學作業", "icon": "🧮"},
-            {"name": "英文作業", "icon": "📚"},
-            {"name": "程式作業", "icon": "💻"},
-            {"name": "報告撰寫", "icon": "📝"},
-            {"name": "閱讀作業", "icon": "📖"},
-            {"name": "實驗報告", "icon": "🔬"}
-        ]
-        
         bubble = {
             "type": "bubble",
             "size": "mega",
@@ -96,7 +85,7 @@ class AddTaskFlowManager:
                     },
                     {
                         "type": "text",
-                        "text": "或從下方快速選擇：",
+                        "text": "（請直接輸入名稱，支持中英文與 emoji）",
                         "size": "sm",
                         "color": "#6B7280",
                         "margin": "sm"
@@ -104,111 +93,25 @@ class AddTaskFlowManager:
                     {
                         "type": "separator",
                         "margin": "lg"
-                    },
+                    }
+                ]
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
                     {
-                        "type": "text",
-                        "text": "⚡ 常用作業",
-                        "size": "sm",
-                        "weight": "bold",
-                        "color": "#4B5563"
+                        "type": "button",
+                        "action": {
+                            "type": "postback",
+                            "label": "❌ 取消",
+                            "data": "cancel_add_task"
+                        },
+                        "style": "secondary"
                     }
                 ]
             }
         }
-        
-        # 添加常用作業按鈕（兩行三列）
-        quick_buttons_row1 = []
-        quick_buttons_row2 = []
-        
-        for i, task in enumerate(common_tasks):
-            button = {
-                "type": "button",
-                "action": {
-                    "type": "postback",
-                    "label": f"{task['icon']} {task['name']}",
-                    "data": f"quick_task_{task['name']}"
-                },
-                "style": "secondary",
-                "height": "sm",
-                "flex": 1
-            }
-            if i < 3:
-                quick_buttons_row1.append(button)
-            else:
-                quick_buttons_row2.append(button)
-        
-        # 添加按鈕行
-        bubble["body"]["contents"].extend([
-            {
-                "type": "box",
-                "layout": "horizontal",
-                "spacing": "sm",
-                "margin": "sm",
-                "contents": quick_buttons_row1
-            },
-            {
-                "type": "box",
-                "layout": "horizontal",
-                "spacing": "sm",
-                "margin": "sm",
-                "contents": quick_buttons_row2
-            }
-        ])
-        
-        # 如果有歷史記錄，加入歷史記錄區塊
-        if name_history:
-            history_buttons = []
-            for name in name_history[-3:]:  # 最近3個
-                history_buttons.append({
-                    "type": "button",
-                    "action": {
-                        "type": "postback",
-                        "label": f"📋 {name}",
-                        "data": f"history_task_{name}"
-                    },
-                    "style": "secondary",
-                    "height": "sm"
-                })
-            
-            bubble["body"]["contents"].extend([
-                {
-                    "type": "separator",
-                    "margin": "lg"
-                },
-                {
-                    "type": "text",
-                    "text": "📋 最近使用",
-                    "size": "sm",
-                    "weight": "bold",
-                    "color": "#4B5563",
-                    "margin": "lg"
-                },
-                {
-                    "type": "box",
-                    "layout": "vertical",
-                    "spacing": "sm",
-                    "margin": "sm",
-                    "contents": history_buttons
-                }
-            ])
-        
-        # Footer 取消按鈕
-        bubble["footer"] = {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-                {
-                    "type": "button",
-                    "action": {
-                        "type": "postback",
-                        "label": "❌ 取消",
-                        "data": "cancel_add_task"
-                    },
-                    "style": "secondary"
-                }
-            ]
-        }
-        
         return bubble
 
     @staticmethod
@@ -321,10 +224,9 @@ class AddTaskFlowManager:
             }
         }
         
-        # 創建時間按鈕（兩行三列）
-        time_buttons_row1 = []
-        time_buttons_row2 = []
-        
+        # 創建時間按鈕（3×2）
+        time_buttons_rows = [[] for _ in range(2)]  # 2 row
+
         for i, time_option in enumerate(quick_times):
             is_recommended = time_option["time"] == most_common_time
             button = {
@@ -339,30 +241,18 @@ class AddTaskFlowManager:
                 "height": "sm",
                 "flex": 1
             }
-            
-            if i < 3:
-                time_buttons_row1.append(button)
-            else:
-                time_buttons_row2.append(button)
-        
-        # 添加時間按鈕
-        bubble["body"]["contents"].extend([
-            {
+            row = i // 3  # 0, 1
+            time_buttons_rows[row].append(button)
+
+        for row_buttons in time_buttons_rows:
+            bubble["body"]["contents"].append({
                 "type": "box",
                 "layout": "horizontal",
                 "spacing": "sm",
                 "margin": "sm",
-                "contents": time_buttons_row1
-            },
-            {
-                "type": "box",
-                "layout": "horizontal",
-                "spacing": "sm",
-                "margin": "sm",
-                "contents": time_buttons_row2
-            }
-        ])
-        
+                "contents": row_buttons
+            })
+
         # 如果有不同的歷史記錄，加入其他常用時間
         unique_history = [t for t in time_history[-5:] if t not in [opt["time"] for opt in quick_times]]
         if unique_history:
@@ -546,9 +436,9 @@ class AddTaskFlowManager:
         }
         
         # 創建類型按鈕（兩行四列）
-        type_buttons_row1 = []
-        type_buttons_row2 = []
-        
+        # 創建類型按鈕（4×2）
+        type_buttons_rows = [[] for _ in range(2)]  # 2 row
+
         for i, config in enumerate(type_configs):
             button = {
                 "type": "button",
@@ -562,30 +452,18 @@ class AddTaskFlowManager:
                 "height": "sm",
                 "flex": 1
             }
-            
-            if i < 4:
-                type_buttons_row1.append(button)
-            else:
-                type_buttons_row2.append(button)
-        
-        # 添加類型按鈕
-        bubble["body"]["contents"].extend([
-            {
+            row = i // 4  # 0, 1
+            type_buttons_rows[row].append(button)
+
+        for row_buttons in type_buttons_rows:
+            bubble["body"]["contents"].append({
                 "type": "box",
                 "layout": "horizontal",
                 "spacing": "sm",
                 "margin": "sm",
-                "contents": type_buttons_row1
-            },
-            {
-                "type": "box",
-                "layout": "horizontal",
-                "spacing": "sm",
-                "margin": "sm",
-                "contents": type_buttons_row2
-            }
-        ])
-        
+                "contents": row_buttons
+            })
+  
         # 加入歷史記錄（如果有且不重複）
         unique_history = [t for t in type_history[-3:] if t not in [config["name"] for config in type_configs]]
         if unique_history:
