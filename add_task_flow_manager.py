@@ -1231,12 +1231,12 @@ class AddTaskFlowManager:
 
     @staticmethod
     def _create_natural_confirmation_bubble(temp_task, ai_filled):
-        """創建自然語言新增作業的確認卡片"""
+        """創建自然語言新增作業的確認卡片（已修正）"""
         task_name = temp_task.get('task', '未設定')
         estimated_time = temp_task.get('estimated_time', 0)
         category = temp_task.get('category', '未設定')
         due_date = temp_task.get('due', '未設定')
-        
+
         # 處理截止日期顯示
         due_display = due_date
         due_color = "#666666"
@@ -1244,11 +1244,10 @@ class AddTaskFlowManager:
             try:
                 due_datetime = datetime.datetime.strptime(due_date, "%Y-%m-%d")
                 due_display = due_datetime.strftime("%Y年%m月%d日")
-                
-                # 計算距離天數並設定顏色
+
                 now_date = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
                 days_diff = (due_datetime.date() - now_date).days
-                
+
                 if days_diff == 0:
                     due_display += " (今天)"
                     due_color = "#DC2626"
@@ -1262,14 +1261,67 @@ class AddTaskFlowManager:
                     due_color = "#10B981"
             except:
                 pass
-        
-        # 根據類型選擇圖示
+
         category_icons = {
             "閱讀": "📖", "寫作": "✍️", "程式": "💻", "計算": "🧮",
             "報告": "📊", "實驗": "🔬", "練習": "📝", "研究": "🔍"
         }
         category_icon = category_icons.get(category, "📋")
-        
+
+        # 動態建立 預估時間 標題列
+        estimated_time_header_contents = [
+            {
+                "type": "text",
+                "text": "預估時間",
+                "size": "sm",
+                "color": "#6B7280"
+            }
+        ]
+        if "estimated_time" in ai_filled:
+            estimated_time_header_contents.append({
+                "type": "text",
+                "text": "🤖 AI 預設",
+                "size": "xs",
+                "color": "#8B5CF6",
+                "margin": "md"
+            })
+
+        # 動態建立 作業類型 標題列
+        category_header_contents = [
+            {
+                "type": "text",
+                "text": "作業類型",
+                "size": "sm",
+                "color": "#6B7280"
+            }
+        ]
+        if "category" in ai_filled:
+            category_header_contents.append({
+                "type": "text",
+                "text": "🤖 AI 推測",
+                "size": "xs",
+                "color": "#8B5CF6",
+                "margin": "md"
+            })
+
+        # 動態建立 截止日期 標題列
+        due_header_contents = [
+            {
+                "type": "text",
+                "text": "截止日期",
+                "size": "sm",
+                "color": "#6B7280"
+            }
+        ]
+        if "due" in ai_filled:
+            due_header_contents.append({
+                "type": "text",
+                "text": "🤖 AI 預設",
+                "size": "xs",
+                "color": "#8B5CF6",
+                "margin": "md"
+            })
+
         bubble = {
             "type": "bubble",
             "size": "mega",
@@ -1349,21 +1401,7 @@ class AddTaskFlowManager:
                                             {
                                                 "type": "box",
                                                 "layout": "horizontal",
-                                                "contents": [
-                                                    {
-                                                        "type": "text",
-                                                        "text": "預估時間",
-                                                        "size": "sm",
-                                                        "color": "#6B7280"
-                                                    },
-                                                    {
-                                                        "type": "text",
-                                                        "text": "🤖 AI 預設" if "estimated_time" in ai_filled else "",
-                                                        "size": "xs",
-                                                        "color": "#8B5CF6",
-                                                        "margin": "md"
-                                                    }
-                                                ]
+                                                "contents": estimated_time_header_contents # <-- 使用動態列表
                                             },
                                             {
                                                 "type": "text",
@@ -1391,21 +1429,7 @@ class AddTaskFlowManager:
                                             {
                                                 "type": "box",
                                                 "layout": "horizontal",
-                                                "contents": [
-                                                    {
-                                                        "type": "text",
-                                                        "text": "作業類型",
-                                                        "size": "sm",
-                                                        "color": "#6B7280"
-                                                    },
-                                                    {
-                                                        "type": "text",
-                                                        "text": "🤖 AI 推測" if "category" in ai_filled else "",
-                                                        "size": "xs",
-                                                        "color": "#8B5CF6",
-                                                        "margin": "md"
-                                                    }
-                                                ]
+                                                "contents": category_header_contents # <-- 使用動態列表
                                             },
                                             {
                                                 "type": "text",
@@ -1433,21 +1457,7 @@ class AddTaskFlowManager:
                                             {
                                                 "type": "box",
                                                 "layout": "horizontal",
-                                                "contents": [
-                                                    {
-                                                        "type": "text",
-                                                        "text": "截止日期",
-                                                        "size": "sm",
-                                                        "color": "#6B7280"
-                                                    },
-                                                    {
-                                                        "type": "text",
-                                                        "text": "🤖 AI 預設" if "due" in ai_filled else "",
-                                                        "size": "xs",
-                                                        "color": "#8B5CF6",
-                                                        "margin": "md"
-                                                    }
-                                                ]
+                                                "contents": due_header_contents # <-- 使用動態列表
                                             },
                                             {
                                                 "type": "text",
@@ -1486,7 +1496,7 @@ class AddTaskFlowManager:
                         "action": {
                             "type": "postback",
                             "label": "✏️ 修改",
-                            "data": "add_task"
+                            "data": "add_task" # 讓使用者可以回到手動新增流程修改
                         },
                         "style": "secondary",
                         "flex": 1
@@ -1504,8 +1514,7 @@ class AddTaskFlowManager:
                 ]
             }
         }
-        
-        # 如果有 AI 填寫的欄位，在底部加入提示
+
         if ai_filled:
             bubble["body"]["contents"].append({
                 "type": "text",
@@ -1515,7 +1524,7 @@ class AddTaskFlowManager:
                 "align": "center",
                 "margin": "lg"
             })
-        
+
         return bubble
 
 # ==================== 更新後的處理器函數 ====================
