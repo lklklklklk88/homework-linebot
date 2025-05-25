@@ -17,9 +17,8 @@ from postback_handler import (
     handle_clear_completed,
     handle_clear_expired
 )
-from task_parser import parse_task_from_text
 from intent_utils import classify_intent_by_gemini, parse_task_info_from_text
-from flex_utils import make_optimized_schedule_card, extract_schedule_blocks, make_timetable_card, make_weekly_progress_card
+from flex_utils import make_optimized_schedule_card, extract_schedule_blocks
 from firebase_admin import db
 from gemini_client import call_gemini_schedule
 from scheduler import generate_optimized_schedule_prompt
@@ -266,30 +265,6 @@ def analyze_user_habits(user_id):
         "break_frequency": "每90分鐘休息15分鐘"
     }
 
-def get_weekly_progress_for_user(user_id):
-    """
-    獲取用戶週進度
-    """
-    try:
-        progress = get_weekly_progress(user_id)
-        if not progress:
-            return "本週還沒有完成任何任務喔！"
-        
-        card = make_weekly_progress_card(
-            completed_tasks=progress.get("completed_tasks", 0),
-            total_hours=progress.get("total_hours", 0),
-            avg_hours_per_day=progress.get("avg_hours_per_day", 0)
-        )
-        
-        return FlexMessage(
-            alt_text="本週進度",
-            contents=FlexContainer.from_dict(card)
-        )
-        
-    except Exception as e:
-        print(f"獲取週進度時發生錯誤：{str(e)}")
-        return "抱歉，獲取週進度時發生錯誤，請稍後再試。"
-
 def parse_schedule_response(raw_text):
     """
     解析排程回應
@@ -325,31 +300,6 @@ def parse_schedule_response(raw_text):
         total_hours = sum(float(block['duration'].replace('分鐘', '')) / 60 for block in blocks)
 
     return explanation, schedule_text, total_hours
-
-def get_weekly_progress(user_id):
-    """
-    計算並回傳使用者的週進度
-    """
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-    start_of_week = now - datetime.timedelta(days=now.weekday())
-    end_of_week = start_of_week + datetime.timedelta(days=6)
-    
-    tasks = load_data(user_id)
-    completed_tasks = 0
-    total_hours = 0
-    
-    for task in tasks:
-        if task.get("done", False):
-            completed_tasks += 1
-            total_hours += task.get("estimated_time", 0)
-    
-    avg_hours_per_day = total_hours / 7 if completed_tasks > 0 else 0
-
-    return {
-        "completed_tasks": completed_tasks,
-        "total_hours": total_hours,
-        "avg_hours_per_day": avg_hours_per_day
-    }
 
 def _parse_hours(raw: str) -> float:
     # 將全形數字轉半形

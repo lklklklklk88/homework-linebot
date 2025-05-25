@@ -137,16 +137,6 @@ def add_task(user_id, task):
     except Exception as e:
         print(f"新增任務時發生錯誤：{str(e)}")
         return False
-    
-def save_remind_time(user_id, time_str):
-    """統一儲存提醒時間"""
-    try:
-        # 只儲存在一個位置
-        db.reference(f"users/{user_id}/remind_time").set(time_str)
-        return True
-    except Exception as e:
-        print(f"儲存提醒時間失敗：{e}")
-        return False
 
 def get_remind_time(user_id):
     """獲取用戶的提醒時間"""
@@ -176,15 +166,6 @@ def get_add_task_remind_time(user_id):
     except Exception as e:
         print(f"獲取新增作業提醒時間失敗：{e}")
         return "17:00"
-
-def save_add_task_remind_time(user_id, time_str):
-    """儲存新增作業提醒時間"""
-    try:
-        db.reference(f"users/{user_id}/add_task_remind_time").set(time_str)
-        return True
-    except Exception as e:
-        print(f"儲存新增作業提醒時間失敗：{e}")
-        return False
 
 def get_add_task_remind_enabled(user_id):
     """獲取是否啟用新增作業提醒"""

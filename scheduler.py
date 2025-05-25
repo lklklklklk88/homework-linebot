@@ -1,5 +1,4 @@
 import os
-import time
 import datetime
 
 from firebase_admin import db
@@ -13,20 +12,6 @@ from firebase_utils import (
 )
 from linebot.v3.messaging import MessagingApi, Configuration, TextMessage
 from linebot.v3.messaging import ApiClient
-
-
-# 表情符號對應表
-EMOJI_MAP = {
-    'default': '🕘',
-    'meal': '🥪',
-    'study': '📖',
-    'rest': '🧠',
-    'coding': '💻',
-    'writing': '✍️',
-    'reading': '📚',
-    'exercise': '🏃',
-    'meeting': '👥'
-}
 
 configuration = Configuration(access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
 
