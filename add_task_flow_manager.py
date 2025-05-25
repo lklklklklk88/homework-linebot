@@ -1208,9 +1208,14 @@ class AddTaskFlowManager:
         # 獲取 AI 填寫的欄位
         ai_filled = task_info.get("ai_filled", [])
         
+        #如果截止日是空，就填寫未設定
+        if not temp_task.get("due"):
+            temp_task["due"] = "未設定"
+
         # 如果有必要欄位未填寫，使用預設值
         if temp_task["estimated_time"] is None:
             temp_task["estimated_time"] = 2.0  # 預設 2 小時
+
         if temp_task["category"] is None:
             temp_task["category"] = "未分類"
         
