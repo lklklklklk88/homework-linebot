@@ -1199,7 +1199,7 @@ class CompleteTaskFlowManager:
                             "data": "complete_task"
                         },
                         "style": "secondary",
-                        "flex": 1
+                        "flex": 2
                     }
                 ]
             }
