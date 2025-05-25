@@ -32,7 +32,8 @@ class AddTaskFlowManager:
             FlexMessage(
                 alt_text="新增作業",
                 contents=FlexContainer.from_dict(bubble)
-            )
+            ),
+            TextMessage(text="💡 提示：直接輸入作業名稱，或點選常用作業")
         ]
 
         with ApiClient(configuration) as api_client:
@@ -71,9 +72,21 @@ class AddTaskFlowManager:
                 "backgroundColor": "#6366F1",
                 "paddingAll": "20px"
             },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "none",
+                "contents": [
+                    {
+                        "type": "separator",
+                        "margin": "none"
+                    }
+                ]
+            },
             "footer": {
                 "type": "box",
                 "layout": "vertical",
+                "spacing": "sm",
                 "contents": [
                     {
                         "type": "text",
