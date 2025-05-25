@@ -1179,55 +1179,6 @@ class AddTaskFlowManager:
 
         # 仍然失敗就拋例外
         raise ValueError(f"無法解析時間：{raw}")
-    
-    @staticmethod
-    def handle_natural_language_add_task(user_id, text, reply_token, task_info):
-        """處理自然語言新增作業"""
-        if not task_info or not task_info.get("task"):
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(
-                    ReplyMessageRequest(
-                        reply_token=reply_token,
-                        messages=[TextMessage(text="❌ 無法從您的訊息中解析出作業資訊，請重新輸入或使用「新增作業」功能")]
-                    )
-                )
-            return
-        
-        # 準備暫存資料
-        temp_task = {
-            "task": task_info.get("task"),
-            "estimated_time": task_info.get("estimated_time"),
-            "category": task_info.get("category"),
-            "due": task_info.get("due")
-        }
-        
-        # 獲取 AI 填寫的欄位
-        ai_filled = task_info.get("ai_filled", [])
-        
-        # 如果有必要欄位未填寫，使用預設值
-        if temp_task["estimated_time"] is None:
-            temp_task["estimated_time"] = 2.0  # 預設 2 小時
-        if temp_task["category"] is None:
-            temp_task["category"] = "未分類"
-        
-        # 儲存暫存資料
-        set_temp_task(user_id, temp_task)
-        
-        # 直接顯示確認畫面
-        bubble = AddTaskFlowManager._create_natural_confirmation_bubble(temp_task, ai_filled)
-        
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(
-                    reply_token=reply_token,
-                    messages=[
-                        FlexMessage(
-                            alt_text="確認新增作業",
-                            contents=FlexContainer.from_dict(bubble)
-                        )
-                    ]
-                )
-            )
 
     @staticmethod
     def _create_natural_confirmation_bubble(temp_task, ai_filled):
@@ -1595,3 +1546,52 @@ def handle_estimated_time_input(user_id: str, text: str, reply_token: str):
 def handle_task_type_input(user_id: str, text: str, reply_token: str):
     """處理手動輸入作業類型"""
     AddTaskFlowManager.handle_manual_type_input(user_id, text, reply_token)
+
+@staticmethod
+def handle_natural_language_add_task(user_id, text, reply_token, task_info):
+    """處理自然語言新增作業"""
+    if not task_info or not task_info.get("task"):
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[TextMessage(text="❌ 無法從您的訊息中解析出作業資訊，請重新輸入或使用「新增作業」功能")]
+                )
+            )
+        return
+    
+    # 準備暫存資料
+    temp_task = {
+        "task": task_info.get("task"),
+        "estimated_time": task_info.get("estimated_time"),
+        "category": task_info.get("category"),
+        "due": task_info.get("due")
+    }
+        
+    # 獲取 AI 填寫的欄位
+    ai_filled = task_info.get("ai_filled", [])
+    
+    # 如果有必要欄位未填寫，使用預設值
+    if temp_task["estimated_time"] is None:
+        temp_task["estimated_time"] = 2.0  # 預設 2 小時
+    if temp_task["category"] is None:
+        temp_task["category"] = "未分類"
+        
+    # 儲存暫存資料
+    set_temp_task(user_id, temp_task)
+    
+    # 直接顯示確認畫面
+    bubble = AddTaskFlowManager._create_natural_confirmation_bubble(temp_task, ai_filled)
+    
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+             ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[
+                    FlexMessage(
+                        alt_text="確認新增作業",
+                        contents=FlexContainer.from_dict(bubble)
+                    )
+                ]
+            )
+        )
