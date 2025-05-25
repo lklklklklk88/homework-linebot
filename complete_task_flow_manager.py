@@ -957,6 +957,69 @@ class CompleteTaskFlowManager:
             )
 
     @staticmethod
+    def handle_natural_language_complete_task(user_id, text, reply_token):
+        """處理自然語言完成作業"""
+        from intent_utils import parse_complete_task_from_text
+        
+        tasks = load_data(user_id)
+        
+        # 過濾出未完成的作業
+        incomplete_tasks = [task for task in tasks if not task.get("done", False)]
+        
+        if not incomplete_tasks:
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=reply_token,
+                        messages=[TextMessage(text="✅ 太棒了！目前沒有未完成的作業")]
+                    )
+                )
+            return
+        
+        # 使用 AI 解析要完成的作業
+        result = parse_complete_task_from_text(text, tasks)
+        
+        if not result or result.get("confidence", 0) < 0.5:
+            # 信心度太低，顯示作業列表讓用戶選擇
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=reply_token,
+                        messages=[
+                            TextMessage(text="🤔 無法確定您要完成哪個作業，請從列表中選擇：")
+                        ]
+                    )
+                )
+            
+            # 顯示一般的完成作業選擇介面
+            CompleteTaskFlowManager.start_complete_task_flow(user_id, reply_token)
+            return
+        
+        # 找到符合的作業，顯示確認畫面
+        task_index = result.get("task_index")
+        if task_index is None or task_index < 0 or task_index >= len(tasks):
+            CompleteTaskFlowManager._send_error(reply_token)
+            return
+        
+        task = tasks[task_index]
+        
+        # 創建 AI 解析的確認卡片
+        bubble = CompleteTaskFlowManager._create_ai_confirmation_bubble(task, task_index, result)
+        
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[
+                        FlexMessage(
+                            alt_text="確認完成作業",
+                            contents=FlexContainer.from_dict(bubble)
+                        )
+                    ]
+                )
+            )
+
+    @staticmethod
     def _create_ai_confirmation_bubble(task, task_index, ai_result):
         """創建 AI 解析的確認完成作業卡片"""
         task_name = task.get("task", "未命名")
@@ -1245,66 +1308,3 @@ def handle_execute_batch_complete(user_id, reply_token):
 def handle_cancel_complete_task(user_id, reply_token):
     """取消完成作業"""
     CompleteTaskFlowManager.cancel_complete_task(user_id, reply_token)
-
-@staticmethod
-def handle_natural_language_complete_task(user_id, text, reply_token):
-    """處理自然語言完成作業"""
-    from intent_utils import parse_complete_task_from_text
-    
-    tasks = load_data(user_id)
-    
-    # 過濾出未完成的作業
-    incomplete_tasks = [task for task in tasks if not task.get("done", False)]
-    
-    if not incomplete_tasks:
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(
-                    reply_token=reply_token,
-                    messages=[TextMessage(text="✅ 太棒了！目前沒有未完成的作業")]
-                )
-            )
-        return
-    
-    # 使用 AI 解析要完成的作業
-    result = parse_complete_task_from_text(text, tasks)
-    
-    if not result or result.get("confidence", 0) < 0.5:
-        # 信心度太低，顯示作業列表讓用戶選擇
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(
-                    reply_token=reply_token,
-                    messages=[
-                        TextMessage(text="🤔 無法確定您要完成哪個作業，請從列表中選擇：")
-                    ]
-                )
-            )
-        
-        # 顯示一般的完成作業選擇介面
-        CompleteTaskFlowManager.start_complete_task_flow(user_id, reply_token)
-        return
-    
-    # 找到符合的作業，顯示確認畫面
-    task_index = result.get("task_index")
-    if task_index is None or task_index < 0 or task_index >= len(tasks):
-        CompleteTaskFlowManager._send_error(reply_token)
-        return
-    
-    task = tasks[task_index]
-    
-    # 創建 AI 解析的確認卡片
-    bubble = CompleteTaskFlowManager._create_ai_confirmation_bubble(task, task_index, result)
-    
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[
-                    FlexMessage(
-                        alt_text="確認完成作業",
-                        contents=FlexContainer.from_dict(bubble)
-                    )
-                ]
-            )
-        ) 

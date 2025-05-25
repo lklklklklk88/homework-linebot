@@ -77,7 +77,7 @@ def register_message_handlers(handler):
                 # 解析作業資訊
                 task_info = parse_task_info_from_text(text)
                 if task_info:
-                    handle_natural_language_add_task(user_id, text, event.reply_token, task_info)
+                    AddTaskFlowManager.handle_natural_language_add_task(user_id, text, event.reply_token, task_info)
                 else:
                     # 解析失敗，回到一般新增流程
                     handle_add_task(user_id, event.reply_token)
