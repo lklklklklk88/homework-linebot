@@ -1477,7 +1477,7 @@ class AddTaskFlowManager:
             },
             "footer": {
                 "type": "box",
-                "layout": "horizontal",
+                "layout": "vertical", # <-- 外層使用垂直佈局
                 "spacing": "sm",
                 "contents": [
                     {
@@ -1488,28 +1488,35 @@ class AddTaskFlowManager:
                             "data": "confirm_add_task"
                         },
                         "style": "primary",
-                        "color": "#10B981",
-                        "flex": 2
+                        "color": "#10B981"
+                        # 這個按鈕會獨佔一行
                     },
                     {
-                        "type": "button",
-                        "action": {
-                            "type": "postback",
-                            "label": "✏️ 修改",
-                            "data": "add_task" # 讓使用者可以回到手動新增流程修改
-                        },
-                        "style": "secondary",
-                        "flex": 1
-                    },
-                    {
-                        "type": "button",
-                        "action": {
-                            "type": "postback",
-                            "label": "❌ 取消",
-                            "data": "cancel_add_task"
-                        },
-                        "style": "secondary",
-                        "flex": 1
+                        "type": "box",
+                        "layout": "horizontal", # <-- 內層使用水平佈局
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "button",
+                                "action": {
+                                    "type": "postback",
+                                    "label": "✏️ 修改",
+                                    "data": "add_task"
+                                },
+                                "style": "secondary",
+                                "flex": 1 # <-- 讓這兩個按鈕平分寬度
+                            },
+                            {
+                                "type": "button",
+                                "action": {
+                                    "type": "postback",
+                                    "label": "❌ 取消",
+                                    "data": "cancel_add_task"
+                                },
+                                "style": "secondary",
+                                "flex": 1 # <-- 讓這兩個按鈕平分寬度
+                            }
+                        ]
                     }
                 ]
             }
