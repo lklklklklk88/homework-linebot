@@ -18,7 +18,8 @@ from postback_handler import (
     handle_clear_expired
 )
 from task_parser import parse_task_from_text
-from intent_utils import classify_intent_by_gemini, parse_task_info_from_text
+from intent_utils import classify_intent_by_gemini
+from line_utils import parse_task_info_from_text
 from flex_utils import make_schedule_carousel, extract_schedule_blocks, make_timetable_card, make_weekly_progress_card
 from firebase_admin import db
 from gemini_client import call_gemini_schedule
