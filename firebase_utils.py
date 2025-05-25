@@ -318,12 +318,12 @@ def get_all_user_ids():
 def save_remind_time(user_id, time_str):
     db.reference(f"users/{user_id}/remind_time").set(time_str)
     # 變更時間 → 重設「已提醒」記號
-    db.reference(f"users/{user_id}/task_reminded_date").delete()
+    db.reference(f"users/{user_id}/last_task_remind_date").delete()
 
 def save_add_task_remind_time(user_id, time_str):
     db.reference(f"users/{user_id}/add_task_remind_time").set(time_str)
     # 變更時間 → 重設「已提醒」記號
-    db.reference(f"users/{user_id}/add_task_reminded_date").delete()
+    db.reference(f"users/{user_id}/last_add_task_remind_date").delete()
 
 def get_task_remind_enabled(user_id):
     try:

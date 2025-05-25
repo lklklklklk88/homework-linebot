@@ -30,47 +30,6 @@ EMOJI_MAP = {
 
 configuration = Configuration(access_token=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
 
-def send_daily_reminders():
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-    today = now.strftime("%Y-%m-%d")
-    current_time = now.strftime("%H:%M")
-    users = get_all_user_ids()
-
-    for user_id in users:
-        # 1. 未完成作業提醒
-        if get_task_remind_enabled(user_id):
-            remind_time = get_remind_time(user_id)
-            reminded_date = db.reference(f"users/{user_id}/task_reminded_date").get()
-            if remind_time == current_time and reminded_date != today:
-                print(f"推播未完成作業提醒給 {user_id}")
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).push_message(
-                        to=user_id,
-                        messages=[TextMessage(text="📋 記得檢查你有沒有未完成作業哦！")]
-                    )
-                # 更新今日已提醒
-                db.reference(f"users/{user_id}/task_reminded_date").set(today)
-
-        # 2. 新增作業提醒
-        if get_add_task_remind_enabled(user_id):
-            add_remind_time = get_add_task_remind_time(user_id)
-            add_reminded_date = db.reference(f"users/{user_id}/add_task_reminded_date").get()
-            if add_remind_time == current_time and add_reminded_date != today:
-                print(f"推播新增作業提醒給 {user_id}")
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).push_message(
-                        to=user_id,
-                        messages=[TextMessage(text="📝 記得今天要新增作業唷～")]
-                    )
-                # 更新今日已提醒
-                db.reference(f"users/{user_id}/add_task_reminded_date").set(today)
-
-if __name__ == "__main__":
-    print("🟢 合併提醒排程已啟動，每分鐘執行一次")
-    while True:
-        send_daily_reminders()
-        time.sleep(60)
-
 def get_rounded_start_time(minutes_ahead=30):
     """
     計算四捨五入後的開始時間
@@ -136,54 +95,5 @@ def generate_schedule_prompt(user_id, tasks, habits, today, available_hours):
 以下是任務資料（供你安排時間順序使用）：
 {format_task_list(tasks)}
 """
-
-    return prompt
-
-def generate_gemini_prompt(user_id, tasks, habits, today, available_hours):
-    """
-    生成 Gemini 提示詞
-    """
-    # 格式化任務列表
-    task_list = []
-    for task in tasks:
-        if not task.get("done", False):
-            task_list.append(f"- {task['task']}（{task['estimated_time']}小時）")
-
-    # 生成提示詞
-    prompt = f"""請幫我安排今天的學習計畫。
-
-目前待辦事項：
-{chr(10).join(task_list)}
-
-偏好時段：
-- 上午：{habits.get('prefered_morning', '無特別偏好')}
-- 下午：{habits.get('prefered_afternoon', '無特別偏好')}
-
-可用時間：{available_hours}小時
-日期：{today}
-
-請依照以下格式回覆：
-1. 先給一個輕鬆的開場白
-2. 接著列出今日排程，格式如下：
-   1. 🕘 09:00 ~ 10:30｜英文作業
-   2. 10:30 ~ 12:00｜數學作業
-   3. 🥪 12:00 ~ 13:00｜午餐
-   4. 13:00 ~ 14:30｜物理作業
-   5. 🧠 14:30 ~ 14:45｜休息
-   6. 💻 14:45 ~ 16:15｜程式作業
-3. 最後提醒總時數
-
-注意事項：
-1. 時間要連續，不要有空檔
-2. 每個任務之間要留 5-15 分鐘的休息時間
-3. 用餐時間要固定（12:00-13:00）
-4. 每 2 小時要安排一次較長的休息（15-30 分鐘）
-5. 根據任務類型選擇適當的時段
-6. 總時數不要超過可用時間
-7. 使用表情符號來表示不同類型的任務
-8. 時間格式統一使用 24 小時制
-9. 每個任務都要標註預計時長
-
-請確保回覆格式正確，這樣我才能正確解析排程內容。"""
 
     return prompt
