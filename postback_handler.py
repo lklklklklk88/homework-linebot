@@ -3,6 +3,8 @@ import datetime
 import logging
 
 from add_task_flow_manager import AddTaskFlowManager
+from complete_task_flow_manager import CompleteTaskFlowManager
+
 from firebase_utils import (
     load_data, save_data, set_user_state,
     clear_user_state, set_temp_task, get_temp_task, clear_temp_task,
@@ -34,7 +36,6 @@ def register_postback_handlers(handler):
         "add_task": handle_add_task,
         "show_schedule": handle_show_schedule,
         "view_tasks": handle_view_tasks,
-        "complete_task": handle_complete_task_direct,
         "set_remind_time": handle_set_remind_time,
         "clear_completed": handle_clear_completed,
         "clear_expired": handle_clear_expired,
@@ -51,6 +52,9 @@ def register_postback_handlers(handler):
         "set_task_remind": handle_set_task_remind,
         "set_add_task_remind": handle_set_add_task_remind,
         "toggle_add_task_remind": handle_toggle_add_task_remind,
+        "complete_task": lambda u, r: CompleteTaskFlowManager.start_complete_task_flow(u, r),
+        "batch_complete_tasks": lambda u, r: CompleteTaskFlowManager.handle_batch_complete(u, r),
+        "cancel_complete_task": lambda u, r: CompleteTaskFlowManager.cancel_complete_task(u, r),
     }
 
     SPECIAL_HANDLERS = {
@@ -68,7 +72,9 @@ def register_postback_handlers(handler):
         "quick_due_": handle_quick_due,             # 新增：快速截止日期
         "delete_completed_": handle_delete_completed,
         "delete_expired_": handle_delete_expired,
-        "mark_done_": handle_mark_done,
+        "confirm_complete_": lambda d, u, r: handle_confirm_complete(d, u, r),
+        "execute_complete_": lambda d, u, r: handle_execute_complete(d, u, r),
+        "toggle_batch_": lambda d, u, r: handle_toggle_batch(d, u, r),
     }
 
     # 需要特殊處理的 postback（需要完整 event 物件）
@@ -283,6 +289,53 @@ def handle_quick_due(data, user_id, reply_token):
 def handle_cancel_add_task(user_id, reply_token):
     """更新取消處理"""
     AddTaskFlowManager.cancel_add_task(user_id, reply_token)
+
+def handle_confirm_complete(data, user_id, reply_token):
+    """處理確認完成單一作業"""
+    try:
+        task_index = int(data.replace("confirm_complete_", ""))
+        CompleteTaskFlowManager.handle_confirm_complete(user_id, task_index, reply_token)
+    except ValueError:
+        print(f"無效的作業索引：{data}")
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[TextMessage(text="❌ 無效的作業編號")]
+                )
+            )
+
+def handle_execute_complete(data, user_id, reply_token):
+    """執行完成作業"""
+    try:
+        task_index = int(data.replace("execute_complete_", ""))
+        CompleteTaskFlowManager.execute_complete_task(user_id, task_index, reply_token)
+    except ValueError:
+        print(f"無效的作業索引：{data}")
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[TextMessage(text="❌ 無效的作業編號")]
+                )
+            )
+
+def handle_toggle_batch(data, user_id, reply_token):
+    """處理批次選擇切換"""
+    try:
+        task_index = int(data.replace("toggle_batch_", ""))
+        # 這裡需要實作批次選擇的邏輯
+        # 可以在 Firebase 中維護一個選中項目的列表
+        # 暫時回應確認訊息
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[TextMessage(text="✅ 已選擇/取消選擇")]
+                )
+            )
+    except ValueError:
+        print(f"無效的作業索引：{data}")
 
 def handle_show_schedule(user_id, reply_token):
     from line_message_handler import get_today_schedule_for_user  # 避免 import 循環
@@ -516,99 +569,6 @@ def handle_view_tasks(user_id, reply_token):
                     alt_text="作業列表",
                     contents=FlexContainer.from_dict(bubble)
                 )]
-            )
-        )
-
-def handle_complete_task_direct(user_id, reply_token):
-    """直接處理完成作業的邏輯"""
-    tasks = load_data(user_id)
-    
-    # 過濾出未完成的作業
-    incomplete_tasks = [(i, task) for i, task in enumerate(tasks) if not task.get("done", False)]
-    
-    if not incomplete_tasks:
-        reply = "✅ 目前沒有未完成的作業"
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(
-                    reply_token=reply_token,
-                    messages=[TextMessage(text=reply)]
-                )
-            )
-        return
-    
-    # 構建選擇作業的按鈕
-    buttons = []
-    for i, task in incomplete_tasks:
-        buttons.append({
-            "type": "button",
-            "action": {
-                "type": "postback",
-                "label": f"✅ {task['task']}",
-                "data": f"mark_done_{i}"
-            },
-            "style": "secondary"
-        })
-    
-    # 如果按鈕太多，只顯示前10個
-    if len(buttons) > 10:
-        buttons = buttons[:10]
-        
-    bubble = {
-        "type": "bubble",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "md",
-            "contents": [
-                {"type": "text", "text": "✅ 選擇要完成的作業", "weight": "bold", "size": "lg"},
-                {"type": "text", "text": f"共有 {len(incomplete_tasks)} 個未完成作業", "size": "sm", "color": "#888888"}
-            ] + buttons
-        }
-    }
-    
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[FlexMessage(
-                    alt_text="選擇要完成的作業",
-                    contents=FlexContainer.from_dict(bubble)
-                )]
-            )
-        )
-
-def handle_mark_done(data, user_id, reply_token):
-    """
-    處理標記作業為完成的 postback
-    data 格式：mark_done_0, mark_done_1 等
-    """
-    try:
-        # 從 data 中提取作業索引
-        task_index = int(data.replace("mark_done_", ""))
-        tasks = load_data(user_id)
-
-        if 0 <= task_index < len(tasks):
-            # 標記為完成
-            tasks[task_index]["done"] = True
-            save_data(user_id, tasks)
-            reply = f"✅ 已完成作業：{tasks[task_index]['task']}"
-        else:
-            reply = "❌ 找不到該作業"
-
-    except ValueError:
-        print(f"無效的作業索引：{data}")
-        reply = "❌ 無效的作業編號"
-    except Exception as e:
-        print(f"完成作業失敗：{str(e)}")
-        reply = "❌ 發生錯誤，請稍後再試"
-
-    # 回覆訊息
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[TextMessage(text=reply)]
             )
         )
 
