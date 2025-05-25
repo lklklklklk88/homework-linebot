@@ -83,9 +83,6 @@ def remind():
         processed_count = 0
         
         for user_id, user_data in users.items():
-            # if processed_count >= MAX_USERS_PER_RUN:
-            #     break
-
             try:
                 if not isinstance(user_data, dict):
                     continue
@@ -100,11 +97,10 @@ def remind():
 
                 if add_task_remind_enabled and time_should_remind(add_task_remind_time, now):
                     if last_add_task_remind_date != today_str:
-                        if last_add_task_date != today_str:
-                            # 今天還沒新增作業，發送提醒
-                            send_add_task_reminder(user_id)
-                            db.reference(f"users/{user_id}/last_add_task_remind_date").set(today_str)
-                            print(f"[remind][add_task] 推播新增作業提醒給 {user_id}")
+                        # 今天還沒新增作業，發送提醒
+                        send_add_task_reminder(user_id)
+                        db.reference(f"users/{user_id}/last_add_task_remind_date").set(today_str)
+                        print(f"[remind][add_task] 推播新增作業提醒給 {user_id}")
 
                 # 檢查未完成作業提醒
                 remind_time = get_remind_time(user_id)
@@ -183,10 +179,22 @@ def remind():
     return "OK"
 
 def send_add_task_reminder(user_id):
-    """發送新增作業提醒"""
+    """發送新增作業提醒（根據今天有沒有新增作業顯示不同內容）"""
     try:
         display_name = get_line_display_name(user_id)
-        
+        user_data = db.reference(f"users/{user_id}").get()
+        last_add_task_date = user_data.get("last_add_task_date", "")
+
+        today_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+        if last_add_task_date == today_str:
+            # 今天已經有新增作業，鼓勵補充
+            main_text = "你今天已經有新增作業囉 🎉"
+            sub_text = "如果還有新的作業，記得馬上補上來，才不會漏掉！"
+        else:
+            # 今天尚未新增作業
+            main_text = "今天還沒有新增作業喔！"
+            sub_text = "記得把今天的作業記錄下來，這樣才不會忘記 😊"
+
         bubble = {
             "type": "bubble",
             "size": "kilo",
@@ -218,14 +226,14 @@ def send_add_task_reminder(user_id):
                     },
                     {
                         "type": "text",
-                        "text": "今天還沒有新增作業喔！",
+                        "text": main_text,
                         "size": "sm",
                         "color": "#666666",
                         "wrap": True
                     },
                     {
                         "type": "text",
-                        "text": "記得把今天的作業記錄下來，這樣才不會忘記 😊",
+                        "text": sub_text,
                         "size": "sm",
                         "color": "#666666",
                         "wrap": True,
@@ -260,20 +268,21 @@ def send_add_task_reminder(user_id):
                 ]
             }
         }
-        
+
         line_bot_api.push_message(
             PushMessageRequest(
                 to=user_id,
                 messages=[FlexMessage(
-                    alt_text="今天還沒有新增作業喔！",
+                    alt_text=main_text,
                     contents=FlexContainer.from_dict(bubble)
                 )]
             )
         )
         print(f"[remind] 已發送新增作業提醒給 {user_id}")
-        
+
     except Exception as e:
         print(f"[remind] 發送新增作業提醒失敗：{e}")
+
 
 if __name__ == "__main__":
     app.run()
