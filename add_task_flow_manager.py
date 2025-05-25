@@ -110,7 +110,8 @@ class AddTaskFlowManager:
                             "label": "❌ 取消",
                             "data": "cancel_add_task"
                         },
-                        "style": "secondary"
+                        "style": "secondary",
+                        "margin": "sm"
                     }
                 ]
             }
