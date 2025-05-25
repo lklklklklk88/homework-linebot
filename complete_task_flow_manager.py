@@ -956,6 +956,317 @@ class CompleteTaskFlowManager:
                 )
             )
 
+@staticmethod
+def handle_natural_language_complete_task(user_id, text, reply_token):
+    """處理自然語言完成作業"""
+    from intent_utils import parse_complete_task_from_text
+    
+    tasks = load_data(user_id)
+    
+    # 過濾出未完成的作業
+    incomplete_tasks = [task for task in tasks if not task.get("done", False)]
+    
+    if not incomplete_tasks:
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[TextMessage(text="✅ 太棒了！目前沒有未完成的作業")]
+                )
+            )
+        return
+    
+    # 使用 AI 解析要完成的作業
+    result = parse_complete_task_from_text(text, tasks)
+    
+    if not result or result.get("confidence", 0) < 0.5:
+        # 信心度太低，顯示作業列表讓用戶選擇
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[
+                        TextMessage(text="🤔 無法確定您要完成哪個作業，請從列表中選擇：")
+                    ]
+                )
+            )
+        
+        # 顯示一般的完成作業選擇介面
+        CompleteTaskFlowManager.start_complete_task_flow(user_id, reply_token)
+        return
+    
+    # 找到符合的作業，顯示確認畫面
+    task_index = result.get("task_index")
+    if task_index is None or task_index < 0 or task_index >= len(tasks):
+        CompleteTaskFlowManager._send_error(reply_token)
+        return
+    
+    task = tasks[task_index]
+    
+    # 創建 AI 解析的確認卡片
+    bubble = CompleteTaskFlowManager._create_ai_confirmation_bubble(task, task_index, result)
+    
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[
+                    FlexMessage(
+                        alt_text="確認完成作業",
+                        contents=FlexContainer.from_dict(bubble)
+                    )
+                ]
+            )
+        )
+
+@staticmethod
+def _create_ai_confirmation_bubble(task, task_index, ai_result):
+    """創建 AI 解析的確認完成作業卡片"""
+    task_name = task.get("task", "未命名")
+    category = task.get("category", "未分類")
+    estimated_time = task.get("estimated_time", 0)
+    due = task.get("due", "未設定")
+    confidence = ai_result.get("confidence", 0)
+    reason = ai_result.get("reason", "")
+    
+    # 計算完成時間統計
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+    completion_info = ""
+    
+    if due != "未設定":
+        try:
+            due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
+            today = now.date()
+            days_diff = (due_date - today).days
+            
+            if days_diff < 0:
+                completion_info = f"已延遲 {abs(days_diff)} 天"
+                info_color = "#DC2626"
+            elif days_diff == 0:
+                completion_info = "準時完成！"
+                info_color = "#10B981"
+            else:
+                completion_info = f"提前 {days_diff} 天完成"
+                info_color = "#3B82F6"
+        except:
+            completion_info = ""
+            info_color = "#666666"
+    
+    bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "🤖 AI 智慧辨識",
+                    "color": "#FFFFFF",
+                    "size": "lg",
+                    "weight": "bold"
+                },
+                {
+                    "type": "text",
+                    "text": f"信心度：{int(confidence * 100)}%",
+                    "color": "#FFFFFF",
+                    "size": "sm",
+                    "margin": "sm"
+                }
+            ],
+            "backgroundColor": "#8B5CF6",
+            "paddingAll": "15px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "🎯 找到符合的作業：",
+                    "size": "md",
+                    "color": "#4B5563",
+                    "weight": "bold"
+                },
+                {
+                    "type": "text",
+                    "text": task_name,
+                    "size": "lg",
+                    "weight": "bold",
+                    "wrap": True,
+                    "color": "#1F2937",
+                    "margin": "sm"
+                },
+                {
+                    "type": "separator",
+                    "margin": "md"
+                },
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "sm",
+                    "margin": "md",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "📚 類型",
+                                    "size": "sm",
+                                    "color": "#6B7280",
+                                    "flex": 2
+                                },
+                                {
+                                    "type": "text",
+                                    "text": category,
+                                    "size": "sm",
+                                    "color": "#1F2937",
+                                    "flex": 3,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "⏱️ 預估時間",
+                                    "size": "sm",
+                                    "color": "#6B7280",
+                                    "flex": 2
+                                },
+                                {
+                                    "type": "text",
+                                    "text": f"{estimated_time} 小時",
+                                    "size": "sm",
+                                    "color": "#1F2937",
+                                    "flex": 3,
+                                    "weight": "bold"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": "📅 截止日期",
+                                    "size": "sm",
+                                    "color": "#6B7280",
+                                    "flex": 2
+                                },
+                                {
+                                    "type": "text",
+                                    "text": due if due != "未設定" else "無期限",
+                                    "size": "sm",
+                                    "color": "#1F2937",
+                                    "flex": 3,
+                                    "weight": "bold"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "horizontal",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "✅ 確認完成",
+                        "data": f"execute_complete_{task_index}"
+                    },
+                    "style": "primary",
+                    "color": "#10B981",
+                    "flex": 2
+                },
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "❌ 不是這個",
+                        "data": "complete_task"
+                    },
+                    "style": "secondary",
+                    "flex": 1
+                }
+            ]
+        }
+    }
+    
+    # 如果有完成時間資訊，添加到 body
+    if completion_info:
+        bubble["body"]["contents"].extend([
+            {
+                "type": "separator",
+                "margin": "md"
+            },
+            {
+                "type": "box",
+                "layout": "horizontal",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "🏆 完成狀態",
+                        "size": "sm",
+                        "color": "#6B7280",
+                        "flex": 2
+                    },
+                    {
+                        "type": "text",
+                        "text": completion_info,
+                        "size": "sm",
+                        "color": info_color,
+                        "flex": 3,
+                        "weight": "bold"
+                    }
+                ]
+            }
+        ])
+    
+    # 如果有 AI 判斷理由，加入說明
+    if reason:
+        bubble["body"]["contents"].extend([
+            {
+                "type": "separator",
+                "margin": "md"
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "🤖 AI 判斷理由",
+                        "size": "sm",
+                        "color": "#8B5CF6",
+                        "weight": "bold"
+                    },
+                    {
+                        "type": "text",
+                        "text": reason,
+                        "size": "xs",
+                        "color": "#6B7280",
+                        "wrap": True,
+                        "margin": "sm"
+                    }
+                ]
+            }
+        ])
+    
+    return bubble
+
 # ==================== 處理器函數 ====================
 
 def handle_complete_task(user_id, reply_token):

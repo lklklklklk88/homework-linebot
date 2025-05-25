@@ -18,7 +18,7 @@ from postback_handler import (
     handle_clear_expired
 )
 from task_parser import parse_task_from_text
-from intent_utils import classify_intent_by_gemini
+from intent_utils import classify_intent_by_gemini, parse_task_info_from_text
 from flex_utils import make_schedule_carousel, extract_schedule_blocks, make_timetable_card, make_weekly_progress_card
 from firebase_admin import db
 from gemini_client import call_gemini_schedule
@@ -72,7 +72,23 @@ def register_message_handlers(handler):
         if not state:
             intent = classify_intent_by_gemini(text)
 
-            if intent == "add_task":
+            # 處理自然語言新增作業
+            if intent == "add_task_natural":
+                # 解析作業資訊
+                task_info = parse_task_info_from_text(text)
+                if task_info:
+                    AddTaskFlowManager.handle_natural_language_add_task(user_id, text, event.reply_token, task_info)
+                else:
+                    # 解析失敗，回到一般新增流程
+                    handle_add_task(user_id, event.reply_token)
+                return
+            
+            # 處理自然語言完成作業
+            elif intent == "complete_task_natural":
+                CompleteTaskFlowManager.handle_natural_language_complete_task(user_id, text, event.reply_token)
+                return
+                
+            elif intent == "add_task":
                 handle_add_task(user_id, event.reply_token)
                 return
             elif intent == "view_tasks":
@@ -104,6 +120,18 @@ def register_message_handlers(handler):
                     "spacing": "md",
                     "contents": [
                         {"type": "text", "text": "請選擇操作", "weight": "bold", "size": "lg"},
+                        {
+                            "type": "text",
+                            "text": "💡 提示：您可以直接用自然語言新增或完成作業",
+                            "size": "xs",
+                            "color": "#8B5CF6",
+                            "wrap": True,
+                            "margin": "sm"
+                        },
+                        {
+                            "type": "separator",
+                            "margin": "md"
+                        },
                         {
                             "type": "button",
                             "action": {"type": "postback", "label": "➕ 新增作業", "data": "add_task"},
@@ -162,7 +190,7 @@ def register_message_handlers(handler):
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
                         messages=[
-                            TextMessage(text="😊 您好！輸入「操作」可以查看所有功能，或直接說出您想要做的事情（例如：新增作業、查看作業等）")
+                            TextMessage(text="😊 您好！我可以幫您管理作業。\n\n💡 您可以直接說：\n• 「下週一要交作業系統，大概花三小時」\n• 「我要完成作業系統」\n• 「查看作業」\n\n或輸入「操作」查看所有功能")
                         ]
                     )
                 )
