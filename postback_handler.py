@@ -1202,7 +1202,7 @@ def handle_set_task_remind(user_id, reply_token):
                         "weight": "bold"
                     }
                 ],
-                "backgroundColor": "#4A90E2",
+                "backgroundColor": "#FF6B6B",
                 "paddingAll": "15px"
             },
             "body": {
@@ -1236,7 +1236,7 @@ def handle_set_task_remind(user_id, reply_token):
                             "min": "00:00"
                         },
                         "style": "primary",
-                        "color": "#4A90E2",
+                        "color": "#FF6B6B",
                         "margin": "lg"
                     }
                 ]
@@ -1292,7 +1292,7 @@ def handle_set_add_task_remind(user_id, reply_token):
                         "weight": "bold"
                     }
                 ],
-                "backgroundColor": "#00BFA5",
+                "backgroundColor": "#FF6B6B",
                 "paddingAll": "15px"
             },
             "body": {
