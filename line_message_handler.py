@@ -565,16 +565,6 @@ def handle_user_guide(user_id, reply_token):
                             "style": "primary",
                             "color": "#6366F1",
                             "flex": 1
-                        },
-                        {
-                            "type": "button",
-                            "action": {
-                                "type": "postback",
-                                "label": "⚙️ 查看功能",
-                                "data": "view_tasks"
-                            },
-                            "style": "secondary",
-                            "flex": 1
                         }
                     ]
                 },
