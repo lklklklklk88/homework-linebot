@@ -179,13 +179,10 @@ class CompleteTaskFlowManager:
                 try:
                     due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
                     if due_date < today:
-                        label_prefix = "🔥 "
                         button_color = "#DC2626"
                     elif due_date == today:
-                        label_prefix = "⏰ "
                         button_color = "#F59E0B"
                     else:
-                        label_prefix = "📅 "
                         button_color = "#3B82F6"
                 except:
                     label_prefix = "📝 "
@@ -207,9 +204,6 @@ class CompleteTaskFlowManager:
                 "style": "secondary",
                 "height": "sm"
             }
-            
-            if button_color:
-                button["color"] = button_color
             
             task_buttons.append(button)
         
