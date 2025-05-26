@@ -52,63 +52,10 @@ def register_message_handlers(handler):
         text = event.message.text.strip()
         state = get_user_state(user_id) 
 
-        # ============= 修復區域：處理用戶狀態 =============
-        # 如果用戶正在進行新增作業流程，優先處理狀態相關的輸入
-        if state == "awaiting_task_name":
-            handle_task_name_input(user_id, text, event.reply_token)
+        if text == "今日排程":
+            handle_show_schedule(user_id, event.reply_token)
             return
-        elif state == "awaiting_task_time":
-            handle_estimated_time_input(user_id, text, event.reply_token)
-            return
-        elif state == "awaiting_task_type":
-            handle_task_type_input(user_id, text, event.reply_token)
-            return
-        elif state == "awaiting_available_hours":
-            handle_available_hours_input(user_id, text, event.reply_token)
-            return
-        # ===============================================
-    
-        # 只有在沒有狀態時才進行意圖分類
-        intent = None
-        if not state:
-            intent = classify_intent_by_gemini(text)
-
-            # 處理自然語言新增作業
-            if intent == "add_task_natural":
-                # 解析作業資訊
-                task_info = parse_task_info_from_text(text)
-                if task_info:
-                    AddTaskFlowManager.handle_natural_language_add_task(user_id, text, event.reply_token, task_info)
-                else:
-                    # 解析失敗，回到一般新增流程
-                    handle_add_task(user_id, event.reply_token)
-                return
-            
-            # 處理自然語言完成作業
-            elif intent == "complete_task_natural":
-                CompleteTaskFlowManager.handle_natural_language_complete_task(user_id, text, event.reply_token)
-                return
-            elif intent == "add_task":
-                handle_add_task(user_id, event.reply_token)
-                return
-            elif intent == "view_tasks":
-                handle_view_tasks(user_id, event.reply_token)
-                return
-            elif intent == "complete_task":
-                CompleteTaskFlowManager.start_complete_task_flow(user_id, event.reply_token)
-                return
-            elif intent == "set_reminder":
-                handle_set_remind_time(user_id, event.reply_token)
-                return
-            elif intent == "clear_completed" or intent == "clear_expired":
-                handle_clear_tasks(user_id, event.reply_token)
-                return
-            elif intent == "show_schedule" or text in ["今日排程", "安排排程", "今天的行程"]:
-                handle_show_schedule(user_id, event.reply_token)
-                return
-        
-        # 處理固定指令
-        if text == "操作":
+        elif text == "操作":
             bubble = {
                 "type": "bubble",
                 "body": {
@@ -178,7 +125,56 @@ def register_message_handlers(handler):
             handle_user_guide(user_id, event.reply_token)
             return
 
-        # 如果沒有匹配到任何處理邏輯，可以給個預設回應
+        intent = classify_intent_by_gemini(text)
+        # 處理自然語言新增作業
+        if intent == "add_task_natural":
+            # 解析作業資訊
+            task_info = parse_task_info_from_text(text)
+            if task_info:
+                AddTaskFlowManager.handle_natural_language_add_task(user_id, text, event.reply_token, task_info)
+            else:
+                # 解析失敗，回到一般新增流程
+                handle_add_task(user_id, event.reply_token)
+            return
+        
+        # 處理自然語言完成作業
+        elif intent == "complete_task_natural":
+            CompleteTaskFlowManager.handle_natural_language_complete_task(user_id, text, event.reply_token)
+            return
+        
+                # 如果沒有匹配到任何處理邏輯，可以給個預設回應
+        elif intent == "add_task":
+            handle_add_task(user_id, event.reply_token)
+            return
+        elif intent == "view_tasks":
+            handle_view_tasks(user_id, event.reply_token)
+            return
+        elif intent == "complete_task":
+            CompleteTaskFlowManager.start_complete_task_flow(user_id, event.reply_token)
+            return
+        elif intent == "set_reminder":
+            handle_set_remind_time(user_id, event.reply_token)
+            return
+        elif intent in ["clear_completed", "clear_expired", "clear_tasks"]:
+            handle_clear_tasks(user_id, event.reply_token)
+            return
+
+        # ============= 修復區域：處理用戶狀態 =============
+        # 如果用戶正在進行新增作業流程，優先處理狀態相關的輸入
+        if state == "awaiting_task_name":
+            handle_task_name_input(user_id, text, event.reply_token)
+            return
+        elif state == "awaiting_task_time":
+            handle_estimated_time_input(user_id, text, event.reply_token)
+            return
+        elif state == "awaiting_task_type":
+            handle_task_type_input(user_id, text, event.reply_token)
+            return
+        elif state == "awaiting_available_hours":
+            handle_available_hours_input(user_id, text, event.reply_token)
+            return
+        # ===============================================
+
         if not state and not intent:
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
