@@ -1461,7 +1461,6 @@ def handle_batch_clear_tasks(user_id, reply_token):
                     },
                     "style": "primary",
                     "color": "#FF3B30",
-                    "disabled": selected_count == 0
                 },
                 {
                     "type": "button",
@@ -1520,7 +1519,7 @@ def handle_execute_batch_clear(user_id, reply_token):
         selected_indices = [int(idx) for idx, is_selected in selection.items() if is_selected]
         
         if not selected_indices:
-            reply = "請至少選擇一個作業"
+            reply = "❌ 請至少選擇一個作業"
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
                     ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
