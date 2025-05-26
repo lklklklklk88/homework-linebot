@@ -1333,8 +1333,8 @@ def handle_batch_clear_tasks(user_id, reply_token):
             )
         return
     
-    # 初始化批次清除狀態
-    db.reference(f"users/{user_id}/batch_clear_selection").set({})
+    # 獲取當前的選擇狀態
+    current_selection = db.reference(f"users/{user_id}/batch_clear_selection").get() or {}
     
     # 過濾出已完成和已過期的作業
     clearable_tasks = []
@@ -1376,6 +1376,13 @@ def handle_batch_clear_tasks(user_id, reply_token):
     # 建立選擇按鈕
     task_buttons = []
     for item in clearable_tasks[:10]:  # 最多顯示10個
+        # 檢查是否已選中
+        is_selected = current_selection.get(str(item['index']), False)
+        checkbox = "☑" if is_selected else "☐"
+        
+        # 根據選中狀態調整按鈕顏色
+        button_color = "#FF6B6B" if is_selected else "#6B7280"
+        
         task_buttons.append({
             "type": "box",
             "layout": "horizontal",
@@ -1385,14 +1392,18 @@ def handle_batch_clear_tasks(user_id, reply_token):
                     "type": "button",
                     "action": {
                         "type": "postback",
-                        "label": f"☐ {item['task']['task'][:8]}... ({item['reason']})",
+                        "label": f"{checkbox} {item['task']['task'][:8]}... ({item['reason']})",
                         "data": f"toggle_clear_{item['index']}"
                     },
                     "style": "secondary",
+                    "color": button_color,
                     "flex": 1
                 }
             ]
         })
+    
+    # 計算已選中的數量
+    selected_count = sum(1 for v in current_selection.values() if v)
     
     bubble = {
         "type": "bubble",
@@ -1425,7 +1436,7 @@ def handle_batch_clear_tasks(user_id, reply_token):
                 },
                 {
                     "type": "text",
-                    "text": f"共 {len(clearable_tasks)} 個可清除",
+                    "text": f"已選擇 {selected_count} 個，共 {len(clearable_tasks)} 個可清除",
                     "size": "sm",
                     "color": "#666666"
                 },
@@ -1445,11 +1456,12 @@ def handle_batch_clear_tasks(user_id, reply_token):
                     "type": "button",
                     "action": {
                         "type": "postback",
-                        "label": "🗑️ 執行清除",
+                        "label": f"🗑️ 執行清除 ({selected_count})",
                         "data": "execute_batch_clear"
                     },
                     "style": "primary",
-                    "color": "#FF3B30"
+                    "color": "#FF3B30",
+                    "disabled": selected_count == 0
                 },
                 {
                     "type": "button",
@@ -1474,7 +1486,7 @@ def handle_batch_clear_tasks(user_id, reply_token):
                 )]
             )
         )
-
+        
 def handle_toggle_clear(data, user_id, reply_token):
     """切換清除選擇狀態"""
     try:
