@@ -88,7 +88,6 @@ def register_message_handlers(handler):
             elif intent == "complete_task_natural":
                 CompleteTaskFlowManager.handle_natural_language_complete_task(user_id, text, event.reply_token)
                 return
-                
             elif intent == "add_task":
                 handle_add_task(user_id, event.reply_token)
                 return
@@ -104,9 +103,9 @@ def register_message_handlers(handler):
             elif intent == "clear_completed" or intent == "clear_expired":
                 handle_clear_tasks(user_id, event.reply_token)
                 return
-            elif intent == "show_schedule":
+            elif intent == "show_schedule" or text in ["今日排程", "安排排程", "今天的行程"]:
                 handle_show_schedule(user_id, event.reply_token)
-                return 
+                return
         
         # 處理固定指令
         if text == "操作":
