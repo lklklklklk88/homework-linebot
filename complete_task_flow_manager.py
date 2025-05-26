@@ -188,7 +188,10 @@ class CompleteTaskFlowManager:
                     label_prefix = "📝 "
             else:
                 label_prefix = "📝 "
-            
+
+            if button_color:
+                button["color"] = button_color
+
             # 處理過長的任務名稱
             task_name = task.get("task", "未命名")
             if len(task_name) > 15:
@@ -257,7 +260,7 @@ class CompleteTaskFlowManager:
                         "data": "batch_complete_tasks"
                     },
                     "style": "primary",
-                    "color": "#7C3AED"
+                    "color": "#10B981"
                 },
                 {
                     "type": "button",
@@ -678,7 +681,7 @@ class CompleteTaskFlowManager:
                         "margin": "sm"
                     }
                 ],
-                "backgroundColor": "#7C3AED",
+                "backgroundColor": "#10B981",
                 "paddingAll": "15px"
             },
             "body": {
