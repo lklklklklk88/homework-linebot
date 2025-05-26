@@ -1378,10 +1378,10 @@ def handle_batch_clear_tasks(user_id, reply_token):
     for item in clearable_tasks[:10]:  # 最多顯示10個
         # 檢查是否已選中
         is_selected = current_selection.get(str(item['index']), False)
-        checkbox = "☑" if is_selected else "☐"
+        checkbox = "✅" if is_selected else "⬜️"
         
         # 根據選中狀態調整按鈕顏色
-        button_color = "#FF6B6B" if is_selected else "#6B7280"
+        button_color = "#FF6B6B" if is_selected else "#D1D5DB"
         
         task_buttons.append({
             "type": "box",
