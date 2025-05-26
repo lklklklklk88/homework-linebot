@@ -24,6 +24,7 @@ def classify_intent_by_gemini(text: str) -> str:
 - set_reminder：設定提醒時間
 - clear_completed：清除已完成作業
 - clear_expired：清除已截止作業
+- clear_tasks：清除作業（包含已完成或已過期）
 - show_schedule：查看今日排程
 - unknown：無法辨識的指令
 
@@ -37,7 +38,7 @@ def classify_intent_by_gemini(text: str) -> str:
     valid_intents = {
         "add_task_natural", "complete_task_natural", "add_task", "view_tasks", 
         "complete_task", "set_reminder", "clear_completed", "clear_expired", 
-        "show_schedule", "unknown"
+        "clear_tasks", "show_schedule", "unknown"
     }
     return result if result in valid_intents else "unknown"
 

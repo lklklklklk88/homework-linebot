@@ -14,8 +14,7 @@ from postback_handler import (
     handle_show_schedule,
     handle_view_tasks,
     handle_set_remind_time,
-    handle_clear_completed,
-    handle_clear_expired
+    handle_clear_tasks
 )
 from intent_utils import classify_intent_by_gemini, parse_task_info_from_text
 from flex_utils import make_optimized_schedule_card, extract_schedule_blocks
@@ -102,11 +101,8 @@ def register_message_handlers(handler):
             elif intent == "set_reminder":
                 handle_set_remind_time(user_id, event.reply_token)
                 return
-            elif intent == "clear_completed":
-                handle_clear_completed(user_id, event.reply_token)
-                return
-            elif intent == "clear_expired":
-                handle_clear_expired(user_id, event.reply_token)
+            elif intent == "clear_completed" or intent == "clear_expired":
+                handle_clear_tasks(user_id, event.reply_token)
                 return
             elif intent == "show_schedule":
                 handle_show_schedule(user_id, event.reply_token)
@@ -156,13 +152,7 @@ def register_message_handlers(handler):
                         },
                         {
                             "type": "button",
-                            "action": {"type": "postback", "label": "🧹 清除已完成作業", "data": "clear_completed"},
-                            "style": "primary",
-                            "color": "#FF3B30"  # ← 紅色
-                        },
-                        {
-                            "type": "button",
-                            "action": {"type": "postback", "label": "🗑️ 清除已截止作業", "data": "clear_expired"},
+                            "action": {"type": "postback", "label": "🧹 清除作業", "data": "clear_tasks"},
                             "style": "primary",
                             "color": "#FF3B30"
                         }
