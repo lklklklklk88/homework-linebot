@@ -344,19 +344,32 @@ def handle_show_schedule(user_id, reply_token):
     set_user_state(user_id, "awaiting_available_hours")
     
     # 快速時間選項
-    quick_hours_options = ["2小時", "3小時", "4小時", "5小時", "6小時", "7小時", "8小時"]
-    hour_buttons = []
+    quick_hours_options = ["1小時", "2小時", "3小時", "4小時", "5小時", "6小時", "7小時", "8小時"]
     
-    for hours in quick_hours_options:
-        hour_buttons.append({
-            "type": "button",
-            "action": {
-                "type": "postback",
-                "label": f"⏰ {hours}",
-                "data": f"schedule_hours_{hours.replace('小時', '')}"
-            },
-            "style": "secondary",
-            "color": "#4A90E2"
+    # 建立 2x4 按鈕配置
+    button_rows = []
+    for i in range(0, len(quick_hours_options), 2):
+        row_buttons = []
+        for j in range(2):
+            if i + j < len(quick_hours_options):
+                hours = quick_hours_options[i + j]
+                row_buttons.append({
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": f"⏰ {hours}",
+                        "data": f"schedule_hours_{hours.replace('小時', '')}"
+                    },
+                    "style": "secondary",
+                    "color": "#4A90E2"
+                })
+        
+        button_rows.append({
+            "type": "box",
+            "layout": "horizontal",
+            "spacing": "sm",
+            "margin": "sm",
+            "contents": row_buttons
         })
     
     bubble = {
@@ -408,27 +421,26 @@ def handle_show_schedule(user_id, reply_token):
                     "weight": "bold",
                     "color": "#4B5563"
                 },
+                *button_rows,  # 展開所有按鈕列
                 {
-                    "type": "box",
-                    "layout": "horizontal",
-                    "spacing": "sm",
-                    "margin": "sm",
-                    "contents": hour_buttons[:4]  # 第一行顯示4個
-                },
-                {
-                    "type": "box",
-                    "layout": "horizontal",
-                    "spacing": "sm",
-                    "margin": "sm",
-                    "contents": hour_buttons[4:]  # 第二行顯示剩餘的
+                    "type": "separator",
+                    "margin": "lg"
                 },
                 {
                     "type": "text",
-                    "text": "或直接輸入時數（例如：4.5）",
+                    "text": "✏️ 或直接輸入時間",
+                    "size": "sm",
+                    "weight": "bold",
+                    "color": "#4B5563",
+                    "margin": "md"
+                },
+                {
+                    "type": "text",
+                    "text": "支援格式：\n• 數字：4.5、2.5\n• 中文：四小時、三小時半\n• 混合：4小時、3.5小時",
                     "size": "xs",
                     "color": "#888888",
-                    "margin": "lg",
-                    "align": "center"
+                    "margin": "sm",
+                    "wrap": True
                 }
             ]
         },
@@ -459,7 +471,7 @@ def handle_show_schedule(user_id, reply_token):
                 )]
             )
         )
-
+        
 def handle_view_tasks(user_id, reply_token):
     """顯示作業列表為一頁式表格"""
     tasks = load_data(user_id)
