@@ -174,6 +174,10 @@ def register_message_handlers(handler):
                     )
                 )
             return
+        
+        elif text == "使用說明":
+            handle_user_guide(user_id, event.reply_token)
+            return
 
         # 如果沒有匹配到任何處理邏輯，可以給個預設回應
         if not state and not intent:
@@ -359,3 +363,240 @@ def handle_available_hours_input(user_id: str, text: str, reply_token: str):
                     messages=[TextMessage(text="❌ 請輸入有效的時數（例如：4 或 4.5）")]
                 )
             )
+
+def handle_user_guide(user_id, reply_token):
+    """顯示使用說明"""
+    bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "📖 使用說明",
+                    "color": "#FFFFFF",
+                    "size": "xl",
+                    "weight": "bold"
+                },
+                {
+                    "type": "text",
+                    "text": "快速上手作業管理助手",
+                    "color": "#FFFFFF",
+                    "size": "sm",
+                    "margin": "sm"
+                }
+            ],
+            "backgroundColor": "#6366F1",
+            "paddingAll": "20px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "lg",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "🚀 快速開始",
+                    "size": "md",
+                    "weight": "bold",
+                    "color": "#1F2937"
+                },
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "sm",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": "• 輸入「操作」- 查看所有功能按鈕",
+                            "size": "sm",
+                            "color": "#4B5563",
+                            "wrap": True
+                        },
+                        {
+                            "type": "text",
+                            "text": "• 直接說話 - 用自然語言操作",
+                            "size": "sm",
+                            "color": "#4B5563",
+                            "wrap": True
+                        }
+                    ]
+                },
+                {
+                    "type": "separator",
+                    "margin": "md"
+                },
+                {
+                    "type": "text",
+                    "text": "💬 自然語言範例",
+                    "size": "md",
+                    "weight": "bold",
+                    "color": "#1F2937"
+                },
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "sm",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": "📝 新增作業：",
+                            "size": "sm",
+                            "weight": "bold",
+                            "color": "#059669"
+                        },
+                        {
+                            "type": "text",
+                            "text": "「明天要交作業系統，大概3小時」",
+                            "size": "xs",
+                            "color": "#6B7280",
+                            "wrap": True,
+                            "margin": "xs"
+                        },
+                        {
+                            "type": "text",
+                            "text": "✅ 完成作業：",
+                            "size": "sm",
+                            "weight": "bold",
+                            "color": "#DC2626",
+                            "margin": "sm"
+                        },
+                        {
+                            "type": "text",
+                            "text": "「我完成作業系統了」",
+                            "size": "xs",
+                            "color": "#6B7280",
+                            "wrap": True,
+                            "margin": "xs"
+                        },
+                        {
+                            "type": "text",
+                            "text": "📋 查看作業：",
+                            "size": "sm",
+                            "weight": "bold",
+                            "color": "#3B82F6",
+                            "margin": "sm"
+                        },
+                        {
+                            "type": "text",
+                            "text": "「查看作業」或「我的作業」",
+                            "size": "xs",
+                            "color": "#6B7280",
+                            "wrap": True,
+                            "margin": "xs"
+                        }
+                    ]
+                },
+                {
+                    "type": "separator",
+                    "margin": "md"
+                },
+                {
+                    "type": "text",
+                    "text": "⚡ 主要功能",
+                    "size": "md",
+                    "weight": "bold",
+                    "color": "#1F2937"
+                },
+                {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "sm",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": "➕ 新增作業 - 記錄待辦事項",
+                            "size": "sm",
+                            "color": "#4B5563"
+                        },
+                        {
+                            "type": "text",
+                            "text": "✅ 完成作業 - 標記已完成項目",
+                            "size": "sm",
+                            "color": "#4B5563"
+                        },
+                        {
+                            "type": "text",
+                            "text": "📋 查看作業 - 檢視所有作業狀態",
+                            "size": "sm",
+                            "color": "#4B5563"
+                        },
+                        {
+                            "type": "text",
+                            "text": "⏰ 提醒設定 - 自動提醒功能",
+                            "size": "sm",
+                            "color": "#4B5563"
+                        },
+                        {
+                            "type": "text",
+                            "text": "📅 今日排程 - AI 智慧安排時間",
+                            "size": "sm",
+                            "color": "#4B5563"
+                        },
+                        {
+                            "type": "text",
+                            "text": "🧹 清除作業 - 管理舊作業",
+                            "size": "sm",
+                            "color": "#4B5563"
+                        }
+                    ]
+                }
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "spacing": "sm",
+                    "contents": [
+                        {
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": "🎯 開始使用",
+                                "data": "add_task"
+                            },
+                            "style": "primary",
+                            "color": "#6366F1",
+                            "flex": 1
+                        },
+                        {
+                            "type": "button",
+                            "action": {
+                                "type": "postback",
+                                "label": "⚙️ 查看功能",
+                                "data": "view_tasks"
+                            },
+                            "style": "secondary",
+                            "flex": 1
+                        }
+                    ]
+                },
+                {
+                    "type": "text",
+                    "text": "💡 隨時輸入「操作」查看完整功能列表",
+                    "size": "xs",
+                    "color": "#6B7280",
+                    "align": "center",
+                    "margin": "sm"
+                }
+            ]
+        }
+    }
+    
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[FlexMessage(
+                    alt_text="使用說明",
+                    contents=FlexContainer.from_dict(bubble)
+                )]
+            )
+        )
