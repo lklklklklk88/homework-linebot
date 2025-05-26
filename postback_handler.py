@@ -1236,6 +1236,7 @@ def handle_set_task_remind(user_id, reply_token):
                             "min": "00:00"
                         },
                         "style": "primary",
+                        "color": "#4A90E2",
                         "margin": "lg"
                     }
                 ]

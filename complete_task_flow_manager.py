@@ -188,10 +188,7 @@ class CompleteTaskFlowManager:
                     label_prefix = "📝 "
             else:
                 label_prefix = "📝 "
-
-            if button_color:
-                button["color"] = button_color
-
+            
             # 處理過長的任務名稱
             task_name = task.get("task", "未命名")
             if len(task_name) > 15:
