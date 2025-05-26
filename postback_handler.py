@@ -46,16 +46,10 @@ def register_postback_handlers(handler):
         "show_schedule": handle_show_schedule,
         "view_tasks": handle_view_tasks,
         "set_remind_time": handle_set_remind_time,
-        "clear_completed": handle_clear_completed,
-        "clear_expired": handle_clear_expired,
         "cancel_add_task": handle_cancel_add_task,
         "confirm_add_task": handle_confirm_add_task,
         "no_due_date": handle_no_due_date,
         "cancel_set_remind": handle_cancel_set_remind,
-        "clear_completed_select": handle_clear_completed_select,
-        "clear_expired_select": handle_clear_expired_select,
-        "cancel_clear_completed": handle_cancel_clear_completed,
-        "cancel_clear_expired": handle_cancel_clear_expired,
         "clear_completed_all": handle_clear_completed_all,
         "clear_expired_all": handle_clear_expired_all,
         "set_task_remind": handle_set_task_remind,
@@ -66,6 +60,10 @@ def register_postback_handlers(handler):
         "cancel_complete_task": lambda u, r: CompleteTaskFlowManager.cancel_complete_task(u, r),
         "execute_batch_complete": lambda u, r: handle_execute_batch_complete(u, r),
         "cancel_schedule": handle_cancel_schedule,
+        "clear_tasks": handle_clear_tasks,
+        "batch_clear_tasks": handle_batch_clear_tasks,
+        "cancel_clear_tasks": handle_cancel_clear_tasks,
+        "execute_batch_clear": handle_execute_batch_clear,
     }
 
     SPECIAL_HANDLERS = {
@@ -81,12 +79,11 @@ def register_postback_handlers(handler):
         "select_time_": handle_select_time,
         "select_type_": handle_select_type,
         "quick_due_": handle_quick_due,             # 新增：快速截止日期
-        "delete_completed_": handle_delete_completed,
-        "delete_expired_": handle_delete_expired,
         "confirm_complete_": lambda d, u, r: handle_confirm_complete(d, u, r),
         "execute_complete_": lambda d, u, r: handle_execute_complete(d, u, r),
         "toggle_batch_": lambda d, u, r: handle_toggle_batch(d, u, r),
         "schedule_hours_": handle_schedule_hours,
+        "toggle_clear_": handle_toggle_clear,
     }
 
     @handler.add(PostbackEvent)
@@ -704,42 +701,6 @@ def handle_cancel_set_remind(user_id, reply_token):
             ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
         )
 
-def handle_clear_completed(user_id, reply_token):
-    bubble = {
-        "type": "bubble",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "md",
-            "contents": [
-                {"type": "text", "text": "🧹 清除已完成作業", "weight": "bold", "size": "lg"},
-                {"type": "text", "text": "請選擇清除方式：", "size": "sm", "color": "#888888"},
-                {
-                    "type": "button",
-                    "action": {"type": "postback", "label": "🧼 手動選擇清除", "data": "clear_completed_select"},
-                    "style": "secondary"
-                },
-                {
-                    "type": "button",
-                    "action": {"type": "postback", "label": "⚡ 一鍵清除全部", "data": "clear_completed_all"},
-                    "style": "primary",
-                    "color": "#FF3B30"  # ← 紅色
-                }
-            ]
-        }
-    }
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[FlexMessage(
-                    alt_text="清除已完成作業",
-                    contents=FlexContainer.from_dict(bubble)
-                )]
-            )
-        )
-
 def handle_clear_completed_all(user_id, reply_token):
     tasks = load_data(user_id)
     if not tasks:
@@ -755,197 +716,6 @@ def handle_clear_completed_all(user_id, reply_token):
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
-        )
-
-def handle_clear_completed_select(user_id, reply_token):
-    tasks = load_data(user_id)
-    completed = [(i, t) for i, t in enumerate(tasks) if t.get("done")]
-
-    if not completed:
-        reply = "✅ 沒有已完成作業需要清除"
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
-            )
-        return
-
-    buttons = [
-        {
-            "type": "button",
-            "action": {
-                "type": "postback",
-                "label": f"🗑️ {task['task']}",
-                "data": f"delete_completed_{i}"
-            },
-            "style": "secondary"
-        }
-        for i, task in completed
-    ]
-
-    buttons.append({
-        "type": "button",
-        "action": {
-            "type": "postback",
-            "label": "❌ 取消",
-            "data": "cancel_clear_completed"
-        },
-        "style": "secondary"
-    })
-
-    bubble = {
-        "type": "bubble",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "md",
-            "contents": [
-                {"type": "text", "text": "選擇要刪除的已完成作業", "weight": "bold", "size": "lg"},
-                {"type": "text", "text": f"共有 {len(completed)} 筆作業", "size": "sm", "color": "#888888"},
-                *buttons
-            ]
-        }
-    }
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[FlexMessage(alt_text="手動刪除已完成作業", contents=FlexContainer.from_dict(bubble))]
-            )
-        )
-
-def handle_cancel_clear_completed(user_id, reply_token):
-    reply = "❌ 已取消清除已完成作業"
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
-        )
-
-def handle_delete_completed(data, user_id, reply_token):
-    try:
-        index = int(data.replace("delete_completed_", ""))
-        tasks = load_data(user_id)
-        if index < 0 or index >= len(tasks) or not tasks[index].get("done"):
-            reply = "❌ 找不到對應的已完成作業"
-        else:
-            deleted = tasks.pop(index)
-            save_data(user_id, tasks)
-            reply = f"🗑️ 已刪除：{deleted['task']}"
-
-    except Exception as e:
-        print(f"刪除已完成作業失敗：{e}")
-        reply = "❌ 刪除過程中發生錯誤"
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
-        )
-
-def handle_clear_expired(user_id, reply_token):
-    bubble = {
-        "type": "bubble",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "md",
-            "contents": [
-                {"type": "text", "text": "🗑️ 清除已截止作業", "weight": "bold", "size": "lg"},
-                {"type": "text", "text": "請選擇清除方式：", "size": "sm", "color": "#888888"},
-                {
-                    "type": "button",
-                    "action": {"type": "postback", "label": "🧼 手動選擇清除", "data": "clear_expired_select"},
-                    "style": "secondary"
-                },
-                {
-                    "type": "button",
-                    "action": {"type": "postback", "label": "⚡ 一鍵清除全部", "data": "clear_expired_all"},
-                    "style": "primary",
-                    "color": "#FF3B30"  # ← 紅色
-                }
-            ]
-        }
-    }
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[FlexMessage(
-                    alt_text="清除已截止作業",
-                    contents=FlexContainer.from_dict(bubble)
-                )]
-            )
-        )
-
-def handle_clear_expired_select(user_id, reply_token):
-    tasks = load_data(user_id)
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
-
-    expired_tasks = []
-    for i, task in enumerate(tasks):
-        if task.get("done", False):
-            continue
-        due = task.get("due", "未設定")
-        if due == "未設定":
-            continue
-        try:
-            due_date = datetime.datetime.strptime(due, "%Y-%m-%d").date()
-            if due_date < now:
-                expired_tasks.append((i, task))
-        except:
-            continue
-
-    if not expired_tasks:
-        reply = "✅ 沒有已截止作業需要清除"
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
-            )
-        return
-
-    buttons = [
-        {
-            "type": "button",
-            "action": {
-                "type": "postback",
-                "label": f"🗑️ {task['task']}",
-                "data": f"delete_expired_{i}"
-            },
-            "style": "secondary"
-        }
-        for i, task in expired_tasks
-    ]
-
-    buttons.append({
-        "type": "button",
-        "action": {
-            "type": "postback",
-            "label": "❌ 取消",
-            "data": "cancel_clear_expired"
-        },
-        "style": "secondary"
-    })
-
-    bubble = {
-        "type": "bubble",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "md",
-            "contents": [
-                {"type": "text", "text": "選擇要刪除的已截止作業", "weight": "bold", "size": "lg"},
-                {"type": "text", "text": f"共有 {len(expired_tasks)} 筆作業", "size": "sm", "color": "#888888"},
-                *buttons
-            ]
-        }
-    }
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[FlexMessage(alt_text="手動刪除已截止作業", contents=FlexContainer.from_dict(bubble))]
-            )
         )
 
 def handle_clear_expired_all(user_id, reply_token):
@@ -983,33 +753,6 @@ def handle_clear_expired_all(user_id, reply_token):
         print(f"一鍵清除已截止作業失敗：{str(e)}")
         reply = "❌ 發生錯誤，請稍後再試"
 
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
-        )
-
-def handle_delete_expired(data, user_id, reply_token):
-    try:
-        index = int(data.replace("delete_expired_", ""))
-        tasks = load_data(user_id)
-        if index < 0 or index >= len(tasks):
-            raise Exception("索引無效")
-
-        deleted_task = tasks.pop(index)
-        save_data(user_id, tasks)
-        reply = f"🗑️ 已刪除：{deleted_task['task']}"
-
-    except Exception as e:
-        print(f"刪除已截止作業失敗：{str(e)}")
-        reply = "❌ 刪除過程中發生錯誤"
-
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(
-            ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
-        )
-
-def handle_cancel_clear_expired(user_id, reply_token):
-    reply = "❌ 已取消清除已截止作業"
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
             ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
@@ -1481,4 +1224,332 @@ def handle_cancel_schedule(user_id, reply_token):
                 reply_token=reply_token,
                 messages=[TextMessage(text="❌ 已取消排程設定")]
             )
+        )
+
+def handle_clear_tasks(user_id, reply_token):
+    """顯示清除作業的選項"""
+    bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "🧹 清除作業",
+                    "color": "#FFFFFF",
+                    "size": "lg",
+                    "weight": "bold"
+                }
+            ],
+            "backgroundColor": "#FF3B30",
+            "paddingAll": "15px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "請選擇清除方式",
+                    "size": "md",
+                    "weight": "bold",
+                    "color": "#333333"
+                },
+                {
+                    "type": "separator",
+                    "margin": "md"
+                },
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "✅ 批次選擇清除",
+                        "data": "batch_clear_tasks"
+                    },
+                    "style": "secondary",
+                    "height": "sm"
+                },
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "🧹 一次清除已完成",
+                        "data": "clear_completed_all"
+                    },
+                    "style": "secondary",
+                    "height": "sm"
+                },
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "🗑️ 一次清除已過期",
+                        "data": "clear_expired_all"
+                    },
+                    "style": "secondary",
+                    "height": "sm"
+                }
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "❌ 取消",
+                        "data": "cancel_clear_tasks"
+                    },
+                    "style": "secondary"
+                }
+            ]
+        }
+    }
+    
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[FlexMessage(
+                    alt_text="清除作業",
+                    contents=FlexContainer.from_dict(bubble)
+                )]
+            )
+        )
+
+def handle_batch_clear_tasks(user_id, reply_token):
+    """顯示批次清除作業的選擇介面"""
+    tasks = load_data(user_id)
+    if not tasks:
+        reply = "目前沒有任何作業"
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
+            )
+        return
+    
+    # 初始化批次清除狀態
+    db.reference(f"users/{user_id}/batch_clear_selection").set({})
+    
+    # 過濾出已完成和已過期的作業
+    clearable_tasks = []
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
+    
+    for i, task in enumerate(tasks):
+        is_clearable = False
+        clear_reason = ""
+        
+        # 檢查是否已完成
+        if task.get("done", False):
+            is_clearable = True
+            clear_reason = "已完成"
+        # 檢查是否已過期
+        elif task.get("due", "未設定") != "未設定":
+            try:
+                due_date = datetime.datetime.strptime(task["due"], "%Y-%m-%d").date()
+                if due_date < now:
+                    is_clearable = True
+                    clear_reason = "已過期"
+            except:
+                pass
+        
+        if is_clearable:
+            clearable_tasks.append({
+                "index": i,
+                "task": task,
+                "reason": clear_reason
+            })
+    
+    if not clearable_tasks:
+        reply = "沒有可清除的作業（已完成或已過期）"
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
+            )
+        return
+    
+    # 建立選擇按鈕
+    task_buttons = []
+    for item in clearable_tasks[:10]:  # 最多顯示10個
+        task_buttons.append({
+            "type": "box",
+            "layout": "horizontal",
+            "spacing": "md",
+            "contents": [
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": f"☐ {item['task']['task'][:8]}... ({item['reason']})",
+                        "data": f"toggle_clear_{item['index']}"
+                    },
+                    "style": "secondary",
+                    "flex": 1
+                }
+            ]
+        })
+    
+    bubble = {
+        "type": "bubble",
+        "size": "mega",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "🧹 批次清除作業",
+                    "color": "#FFFFFF",
+                    "size": "lg",
+                    "weight": "bold"
+                }
+            ],
+            "backgroundColor": "#FF3B30",
+            "paddingAll": "15px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "md",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "點選要清除的作業",
+                    "size": "md",
+                    "weight": "bold"
+                },
+                {
+                    "type": "text",
+                    "text": f"共 {len(clearable_tasks)} 個可清除",
+                    "size": "sm",
+                    "color": "#666666"
+                },
+                {
+                    "type": "separator",
+                    "margin": "md"
+                },
+                *task_buttons
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "🗑️ 執行清除",
+                        "data": "execute_batch_clear"
+                    },
+                    "style": "primary",
+                    "color": "#FF3B30"
+                },
+                {
+                    "type": "button",
+                    "action": {
+                        "type": "postback",
+                        "label": "❌ 取消",
+                        "data": "cancel_clear_tasks"
+                    },
+                    "style": "secondary"
+                }
+            ]
+        }
+    }
+    
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[FlexMessage(
+                    alt_text="批次清除作業",
+                    contents=FlexContainer.from_dict(bubble)
+                )]
+            )
+        )
+
+def handle_toggle_clear(data, user_id, reply_token):
+    """切換清除選擇狀態"""
+    try:
+        task_index = int(data.replace("toggle_clear_", ""))
+        
+        # 獲取目前的選擇狀態
+        selection_ref = db.reference(f"users/{user_id}/batch_clear_selection/{task_index}")
+        current_state = selection_ref.get()
+        
+        # 切換狀態
+        selection_ref.set(not current_state if current_state else True)
+        
+        # 重新顯示選擇介面
+        handle_batch_clear_tasks(user_id, reply_token)
+        
+    except Exception as e:
+        print(f"切換清除選擇錯誤：{e}")
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[TextMessage(text="❌ 發生錯誤，請重試")]
+                )
+            )
+
+def handle_execute_batch_clear(user_id, reply_token):
+    """執行批次清除"""
+    try:
+        # 獲取選擇的作業
+        selection = db.reference(f"users/{user_id}/batch_clear_selection").get() or {}
+        selected_indices = [int(idx) for idx, is_selected in selection.items() if is_selected]
+        
+        if not selected_indices:
+            reply = "請至少選擇一個作業"
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
+                )
+            return
+        
+        # 執行清除
+        tasks = load_data(user_id)
+        # 從大到小排序，避免刪除時索引錯位
+        selected_indices.sort(reverse=True)
+        
+        cleared_count = 0
+        for idx in selected_indices:
+            if 0 <= idx < len(tasks):
+                tasks.pop(idx)
+                cleared_count += 1
+        
+        # 保存更新後的作業列表
+        save_data(user_id, tasks)
+        
+        # 清除選擇狀態
+        db.reference(f"users/{user_id}/batch_clear_selection").delete()
+        
+        reply = f"✅ 已成功清除 {cleared_count} 個作業"
+        
+    except Exception as e:
+        print(f"批次清除錯誤：{e}")
+        reply = "❌ 清除過程中發生錯誤"
+    
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
+        )
+
+def handle_cancel_clear_tasks(user_id, reply_token):
+    """取消清除作業"""
+    # 清除批次選擇狀態
+    db.reference(f"users/{user_id}/batch_clear_selection").delete()
+    
+    reply = "❌ 已取消清除作業"
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(reply_token=reply_token, messages=[TextMessage(text=reply)])
         )
