@@ -333,6 +333,68 @@ def _parse_hours(raw: str) -> float:
     # 仍然失敗就拋例外
     raise ValueError(f"無法解析時間：{raw}")
 
+def parse_time_input(text):
+    """
+    解析使用者輸入的時間
+    支援格式：
+    - 純數字：4、4.5
+    - 中文數字：四小時、三小時半
+    - 混合格式：4小時、3.5小時
+    
+    返回：浮點數（小時），如果無法解析則返回 None
+    """
+    
+    # 移除空格
+    text = text.strip()
+    
+    # 中文數字對應表
+    chinese_numbers = {
+        '零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
+        '五': 5, '六': 6, '七': 7, '八': 8, '九': 9,
+        '十': 10, '十一': 11, '十二': 12
+    }
+    
+    try:
+        # 1. 純數字（包含小數點）
+        if re.match(r'^[\d.]+$', text):
+            return float(text)
+        
+        # 2. 數字+小時（例如：4小時、3.5小時）
+        match = re.match(r'^([\d.]+)\s*小時?$', text)
+        if match:
+            return float(match.group(1))
+        
+        # 3. 中文數字+小時（例如：四小時、三小時半）
+        # 先處理"半"的情況
+        has_half = '半' in text
+        text_no_half = text.replace('半', '')
+        
+        # 嘗試匹配中文數字
+        for chinese, number in chinese_numbers.items():
+            if chinese in text_no_half:
+                # 替換中文數字為阿拉伯數字
+                text_no_half = text_no_half.replace(chinese, str(number))
+                # 再次嘗試匹配
+                match = re.match(r'^(\d+)\s*小時?$', text_no_half)
+                if match:
+                    hours = float(match.group(1))
+                    if has_half:
+                        hours += 0.5
+                    return hours
+        
+        # 4. 特殊情況：半小時
+        if text in ['半小時', '半個小時']:
+            return 0.5
+        
+        # 5. 一個小時的各種寫法
+        if text in ['一個小時', '1個小時']:
+            return 1.0
+            
+    except ValueError:
+        pass
+    
+    return None
+
 def handle_available_hours_input(user_id: str, text: str, reply_token: str):
     """處理使用者輸入的可用時數"""
     try:
@@ -596,65 +658,3 @@ def handle_user_guide(user_id, reply_token):
                 )]
             )
         )
-
-def parse_time_input(text):
-    """
-    解析使用者輸入的時間
-    支援格式：
-    - 純數字：4、4.5
-    - 中文數字：四小時、三小時半
-    - 混合格式：4小時、3.5小時
-    
-    返回：浮點數（小時），如果無法解析則返回 None
-    """
-    
-    # 移除空格
-    text = text.strip()
-    
-    # 中文數字對應表
-    chinese_numbers = {
-        '零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
-        '五': 5, '六': 6, '七': 7, '八': 8, '九': 9,
-        '十': 10, '十一': 11, '十二': 12
-    }
-    
-    try:
-        # 1. 純數字（包含小數點）
-        if re.match(r'^[\d.]+$', text):
-            return float(text)
-        
-        # 2. 數字+小時（例如：4小時、3.5小時）
-        match = re.match(r'^([\d.]+)\s*小時?$', text)
-        if match:
-            return float(match.group(1))
-        
-        # 3. 中文數字+小時（例如：四小時、三小時半）
-        # 先處理"半"的情況
-        has_half = '半' in text
-        text_no_half = text.replace('半', '')
-        
-        # 嘗試匹配中文數字
-        for chinese, number in chinese_numbers.items():
-            if chinese in text_no_half:
-                # 替換中文數字為阿拉伯數字
-                text_no_half = text_no_half.replace(chinese, str(number))
-                # 再次嘗試匹配
-                match = re.match(r'^(\d+)\s*小時?$', text_no_half)
-                if match:
-                    hours = float(match.group(1))
-                    if has_half:
-                        hours += 0.5
-                    return hours
-        
-        # 4. 特殊情況：半小時
-        if text in ['半小時', '半個小時']:
-            return 0.5
-        
-        # 5. 一個小時的各種寫法
-        if text in ['一個小時', '1個小時']:
-            return 1.0
-            
-    except ValueError:
-        pass
-    
-    return None
