@@ -336,8 +336,11 @@ def _parse_hours(raw: str) -> float:
 def handle_available_hours_input(user_id: str, text: str, reply_token: str):
     """處理使用者輸入的可用時數"""
     try:
-        # 嘗試解析數字
-        hours = float(text.strip())
+        # 使用 parse_time_input 函數來解析各種格式的時間輸入
+        hours = parse_time_input(text)
+        
+        if hours is None:
+            raise ValueError("無法解析時間")
         
         if hours <= 0 or hours > 24:
             raise ValueError("時數必須在 0-24 之間")
@@ -356,11 +359,14 @@ def handle_available_hours_input(user_id: str, text: str, reply_token: str):
                 )
             )
     except ValueError:
+        # 無法解析或超出範圍
+        error_message = "❌ 請輸入有效的時間（0-24小時）\n\n支援格式：\n• 數字：4、4.5\n• 中文：四小時、三小時半\n• 混合：4小時、3.5小時"
+        
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
                 ReplyMessageRequest(
                     reply_token=reply_token,
-                    messages=[TextMessage(text="❌ 請輸入有效的時數（例如：4 或 4.5）")]
+                    messages=[TextMessage(text=error_message)]
                 )
             )
 
@@ -652,38 +658,3 @@ def parse_time_input(text):
         pass
     
     return None
-
-
-# 在 line_message_handler.py 中使用此函數的範例
-def handle_schedule_hours_input(user_id, text, reply_token):
-    """處理使用者輸入的排程時間"""
-    
-    # 使用解析函數
-    hours = parse_time_input(text)
-    
-    if hours is not None and 0 < hours <= 24:
-        # 清除狀態
-        clear_user_state(user_id)
-        
-        # 生成排程
-        from line_message_handler import generate_schedule_for_user
-        response = generate_schedule_for_user(user_id, hours)
-        
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(
-                    reply_token=reply_token,
-                    messages=response if isinstance(response, list) else [TextMessage(text=response)]
-                )
-            )
-    else:
-        # 無法解析或超出範圍
-        error_message = "❌ 請輸入有效的時間（0-24小時）\n\n支援格式：\n• 數字：4、4.5\n• 中文：四小時、三小時半\n• 混合：4小時、3.5小時"
-        
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(
-                    reply_token=reply_token,
-                    messages=[TextMessage(text=error_message)]
-                )
-            )
