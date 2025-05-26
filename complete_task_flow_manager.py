@@ -182,8 +182,6 @@ class CompleteTaskFlowManager:
                         button_color = "#DC2626"
                     elif due_date == today:
                         button_color = "#F59E0B"
-                    else:
-                        button_color = "#3B82F6"
                 except:
                     label_prefix = "📝 "
             else:
@@ -204,6 +202,9 @@ class CompleteTaskFlowManager:
                 "style": "secondary",
                 "height": "sm"
             }
+
+            if button_color:
+                button["color"] = button_color
             
             task_buttons.append(button)
         
