@@ -1335,7 +1335,13 @@ def handle_batch_clear_tasks(user_id, reply_token):
     
     # 獲取當前的選擇狀態
     current_selection = db.reference(f"users/{user_id}/batch_clear_selection").get() or {}
-    
+    # debug log
+    print("DEBUG current_selection type:", type(current_selection), "value:", current_selection)
+
+    if not isinstance(current_selection, dict):
+        print("WARNING: batch_clear_selection 不是 dict，自動重設為空 dict！")
+        current_selection = {}
+        
     # 過濾出已完成和已過期的作業
     clearable_tasks = []
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date()
