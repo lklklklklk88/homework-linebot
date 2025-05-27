@@ -894,7 +894,7 @@ class AddTaskFlowManager:
                         "margin": "sm"
                     }
                 ],
-                "backgroundColor": "#10B981",
+                "backgroundColor": "#6366F1",
                 "paddingAll": "15px"
             },
             "body": {
@@ -1041,7 +1041,7 @@ class AddTaskFlowManager:
                             "data": "confirm_add_task"
                         },
                         "style": "primary",
-                        "color": "#10B981",
+                        "color": "#6366F1",
                         "flex": 2
                     },
                     {
