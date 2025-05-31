@@ -7,6 +7,7 @@ from firebase_utils import (
     load_data, save_data,
     get_add_task_remind_enabled,
     get_add_task_remind_time,
+    get_task_remind_enabled,
     save_add_task_remind_enabled,
     save_add_task_remind_time,
     get_remind_time
@@ -61,9 +62,21 @@ def callback():
 def time_should_remind(remind_time, now):
     """判斷提醒時間是否應該觸發（只要現在 >= 設定時間）"""
     try:
-        remind_dt = datetime.datetime.strptime(remind_time, "%H:%M").replace(
-            year=now.year, month=now.month, day=now.day, tzinfo=now.tzinfo)
-        return now >= remind_dt
+        # 解析提醒時間
+        remind_hour, remind_minute = map(int, remind_time.split(':'))
+        
+        # 獲取當前時間的小時和分鐘
+        current_hour = now.hour
+        current_minute = now.minute
+        
+        # 比較時間
+        if current_hour > remind_hour:
+            return True
+        elif current_hour == remind_hour and current_minute >= remind_minute:
+            return True
+        else:
+            return False
+            
     except Exception as e:
         print(f"【DEBUG】解析提醒時間錯誤：{remind_time}, {e}")
         return False
@@ -238,56 +251,71 @@ def remind():
                 if not isinstance(user_data, dict):
                     continue
 
-                # 檢查新增作業提醒
+                # ========== 檢查新增作業提醒 ==========
                 add_task_remind_enabled = get_add_task_remind_enabled(user_id)
                 add_task_remind_time = get_add_task_remind_time(user_id)
                 last_add_task_remind_date = user_data.get("last_add_task_remind_date", "")
-                last_add_task_date = user_data.get("last_add_task_date", "")
+                
+                print(f"[remind][add_task] user={user_id}, enabled={add_task_remind_enabled}, "
+                      f"remind_time={add_task_remind_time}, now={current_time_str}, "
+                      f"last_remind={last_add_task_remind_date}, today={today_str}")
 
-                print(f"[remind][add_task] user={user_id}, enabled={add_task_remind_enabled}, remind_time={add_task_remind_time}, now={current_time_str}, last_remind={last_add_task_remind_date}, last_add={last_add_task_date}, today={today_str}")
-
+                # 檢查是否應該發送新增作業提醒
                 if add_task_remind_enabled and time_should_remind(add_task_remind_time, now):
+                    # 確保今天還沒提醒過
                     if last_add_task_remind_date != today_str:
-                        # 今天還沒新增作業，發送提醒
+                        # 發送提醒
                         send_add_task_reminder(user_id)
+                        # 記錄今天已提醒
                         db.reference(f"users/{user_id}/last_add_task_remind_date").set(today_str)
-                        print(f"[remind][add_task] 推播新增作業提醒給 {user_id}")
+                        print(f"[remind][add_task] 已發送新增作業提醒給 {user_id}")
 
-                # 檢查未完成作業提醒
+                # ========== 檢查未完成作業提醒 ==========
+                task_remind_enabled = get_task_remind_enabled(user_id)
                 remind_time = get_remind_time(user_id)
                 last_task_remind_date = user_data.get("last_task_remind_date", "")
                 tasks = user_data.get("tasks", [])
-                print(f"[remind][task] user={user_id}, remind_time={remind_time}, now={current_time_str}, last_remind={last_task_remind_date}, today={today_str}")
+                
+                print(f"[remind][task] user={user_id}, enabled={task_remind_enabled}, "
+                      f"remind_time={remind_time}, now={current_time_str}, "
+                      f"last_remind={last_task_remind_date}, today={today_str}")
 
-                if time_should_remind(remind_time, now) and last_task_remind_date != today_str:
-                    # 是否有未完成作業
-                    has_task = False
-                    for task in tasks:
-                        if not task.get("done", False):
-                            has_task = True
-                            break
+                # 檢查是否應該發送未完成作業提醒
+                if task_remind_enabled and time_should_remind(remind_time, now):
+                    # 確保今天還沒提醒過
+                    if last_task_remind_date != today_str:
+                        # 檢查是否有未完成作業
+                        has_incomplete_task = False
+                        for task in tasks:
+                            if not task.get("done", False):
+                                has_incomplete_task = True
+                                break
 
-                    if has_task:
-                        display_name = get_line_display_name(user_id)
+                        if has_incomplete_task:
+                            display_name = get_line_display_name(user_id)
 
-                        # 發送文字提醒
-                        try:
-                            line_bot_api.push_message(
-                                PushMessageRequest(
-                                    to=user_id,
-                                    messages=[TextMessage(text=f"⏰ {display_name}，您還有尚未完成的作業喔！來看看吧 👇")]
+                            # 發送文字提醒
+                            try:
+                                line_bot_api.push_message(
+                                    PushMessageRequest(
+                                        to=user_id,
+                                        messages=[TextMessage(
+                                            text=f"⏰ {display_name}，您還有尚未完成的作業喔！來看看吧 👇"
+                                        )]
+                                    )
                                 )
-                            )
-                            print(f"[remind][task] 推播文字提醒給 {user_id}")
-                        except Exception as e:
-                            print(f"[remind][task] 推播文字提醒失敗 {user_id}：{e}")
+                                print(f"[remind][task] 推播文字提醒給 {user_id}")
+                            except Exception as e:
+                                print(f"[remind][task] 推播文字提醒失敗 {user_id}：{e}")
 
-                        # 推播作業列表
-                        send_view_tasks_push(user_id)
+                            # 推播作業列表
+                            send_view_tasks_push(user_id)
 
-                        # 更新最後提醒日期
-                        db.reference(f"users/{user_id}/last_task_remind_date").set(today_str)
-                        print(f"[remind][task] 已更新 {user_id} 的提醒日期")
+                            # 記錄今天已提醒
+                            db.reference(f"users/{user_id}/last_task_remind_date").set(today_str)
+                            print(f"[remind][task] 已更新 {user_id} 的提醒日期")
+                        else:
+                            print(f"[remind][task] {user_id} 沒有未完成的作業，跳過提醒")
 
                 processed_count += 1
 
@@ -295,27 +323,33 @@ def remind():
                 print(f"[remind] 處理用戶 {user_id} 時發生錯誤：{e}")
                 continue
 
+        print(f"[remind] 完成處理 {processed_count} 個用戶")
+        return f"OK - Processed {processed_count} users"
+
     except Exception as e:
         print(f"[remind] 整體錯誤：{e}")
-
-    return "OK"
+        return f"Error: {str(e)}"
 
 def send_add_task_reminder(user_id):
-    """發送新增作業提醒（根據今天有沒有新增作業顯示不同內容）"""
+    """發送新增作業提醒"""
     try:
         display_name = get_line_display_name(user_id)
         user_data = db.reference(f"users/{user_id}").get()
         last_add_task_date = user_data.get("last_add_task_date", "")
 
         today_str = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+        
+        # 根據今天是否已新增作業，顯示不同內容
         if last_add_task_date == today_str:
-            # 今天已經有新增作業，鼓勵補充
+            # 今天已經有新增作業
             main_text = "你今天已經有新增作業囉 🎉"
             sub_text = "如果還有新的作業，記得馬上補上來，才不會漏掉！"
+            button_text = "➕ 繼續新增作業"
         else:
             # 今天尚未新增作業
             main_text = "今天還沒有新增作業喔！"
             sub_text = "記得把今天的作業記錄下來，這樣才不會忘記 😊"
+            button_text = "➕ 立即新增作業"
 
         bubble = {
             "type": "bubble",
@@ -372,7 +406,7 @@ def send_add_task_reminder(user_id):
                         "type": "button",
                         "action": {
                             "type": "postback",
-                            "label": "➕ 立即新增作業",
+                            "label": button_text,
                             "data": "add_task"
                         },
                         "style": "primary",
@@ -404,7 +438,6 @@ def send_add_task_reminder(user_id):
 
     except Exception as e:
         print(f"[remind] 發送新增作業提醒失敗：{e}")
-
 
 if __name__ == "__main__":
     app.run()
