@@ -15,7 +15,7 @@ cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
 temp_file_path = None
 
 with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".json") as temp:
-    temp_file_path = temp.name  # 這行很重要！
+    temp_file_path = temp.name
     json.dump(cred_dict, temp)
     temp.flush()
     cred = credentials.Certificate(temp.name)
@@ -139,43 +139,123 @@ def add_task(user_id, task):
         return False
 
 def get_remind_time(user_id):
-    """獲取用戶的提醒時間"""
+    """獲取未完成作業提醒時間"""
     try:
-        # 從統一位置讀取
+        # 檢查是否已設定過
         ref = db.reference(f"users/{user_id}/remind_time")
         remind_time = ref.get()
-        return remind_time if remind_time else "08:00"  # 預設值
+        
+        # 如果從未設定過，使用預設值並儲存
+        if remind_time is None:
+            remind_time = "08:00"
+            ref.set(remind_time)
+            print(f"[提醒] 為用戶 {user_id} 設定預設未完成作業提醒時間：{remind_time}")
+        
+        return remind_time
     except Exception as e:
         print(f"獲取提醒時間失敗：{e}")
-        return "08:00"  # 預設值
-
-def load_metadata(user_id):
-    ref = db.reference(f"users/{user_id}/meta")
-    return ref.get()
-
-def save_metadata(user_id, data):
-    ref = db.reference(f"users/{user_id}/meta")
-    ref.set(data)
+        return "08:00"
 
 def get_add_task_remind_time(user_id):
     """獲取新增作業提醒時間"""
     try:
+        # 檢查是否已設定過
         ref = db.reference(f"users/{user_id}/add_task_remind_time")
         remind_time = ref.get()
-        return remind_time if remind_time else "17:00"  # 預設下午5點
+        
+        # 如果從未設定過，使用預設值並儲存
+        if remind_time is None:
+            remind_time = "17:00"
+            ref.set(remind_time)
+            print(f"[提醒] 為用戶 {user_id} 設定預設新增作業提醒時間：{remind_time}")
+        
+        return remind_time
     except Exception as e:
         print(f"獲取新增作業提醒時間失敗：{e}")
         return "17:00"
+
+def get_task_remind_enabled(user_id):
+    """獲取是否啟用未完成作業提醒"""
+    try:
+        ref = db.reference(f"users/{user_id}/task_remind_enabled")
+        enabled = ref.get()
+        
+        # 如果從未設定過，預設為啟用
+        if enabled is None:
+            enabled = True
+            ref.set(enabled)
+            print(f"[提醒] 為用戶 {user_id} 設定預設未完成作業提醒狀態：啟用")
+        
+        return enabled
+    except Exception as e:
+        print(f"獲取未完成作業提醒狀態失敗：{e}")
+        return True
 
 def get_add_task_remind_enabled(user_id):
     """獲取是否啟用新增作業提醒"""
     try:
         ref = db.reference(f"users/{user_id}/add_task_remind_enabled")
         enabled = ref.get()
-        return enabled if enabled is not None else True  # 預設啟用
+        
+        # 如果從未設定過，預設為啟用
+        if enabled is None:
+            enabled = True
+            ref.set(enabled)
+            print(f"[提醒] 為用戶 {user_id} 設定預設新增作業提醒狀態：啟用")
+        
+        return enabled
     except Exception as e:
         print(f"獲取新增作業提醒狀態失敗：{e}")
         return True
+
+def save_remind_time(user_id, time_str):
+    """儲存未完成作業提醒時間"""
+    try:
+        db.reference(f"users/{user_id}/remind_time").set(time_str)
+        # 變更時間後，重設今天的提醒狀態，允許新時間生效
+        today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+        last_remind_date = db.reference(f"users/{user_id}/last_task_remind_date").get()
+        
+        # 如果今天已經提醒過，且新時間還沒到，則清除今天的提醒記錄
+        if last_remind_date == today:
+            current_time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%H:%M")
+            if time_str > current_time:
+                db.reference(f"users/{user_id}/last_task_remind_date").delete()
+                print(f"[提醒] 清除用戶 {user_id} 今天的未完成作業提醒記錄，新時間 {time_str} 將生效")
+        
+        return True
+    except Exception as e:
+        print(f"儲存未完成作業提醒時間失敗：{e}")
+        return False
+
+def save_add_task_remind_time(user_id, time_str):
+    """儲存新增作業提醒時間"""
+    try:
+        db.reference(f"users/{user_id}/add_task_remind_time").set(time_str)
+        # 變更時間後，重設今天的提醒狀態，允許新時間生效
+        today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d")
+        last_remind_date = db.reference(f"users/{user_id}/last_add_task_remind_date").get()
+        
+        # 如果今天已經提醒過，且新時間還沒到，則清除今天的提醒記錄
+        if last_remind_date == today:
+            current_time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%H:%M")
+            if time_str > current_time:
+                db.reference(f"users/{user_id}/last_add_task_remind_date").delete()
+                print(f"[提醒] 清除用戶 {user_id} 今天的新增作業提醒記錄，新時間 {time_str} 將生效")
+        
+        return True
+    except Exception as e:
+        print(f"儲存新增作業提醒時間失敗：{e}")
+        return False
+
+def save_task_remind_enabled(user_id, enabled):
+    """儲存是否啟用未完成作業提醒"""
+    try:
+        db.reference(f"users/{user_id}/task_remind_enabled").set(enabled)
+        return True
+    except Exception as e:
+        print(f"儲存未完成作業提醒狀態失敗：{e}")
+        return False
 
 def save_add_task_remind_enabled(user_id, enabled):
     """儲存是否啟用新增作業提醒"""
@@ -185,6 +265,14 @@ def save_add_task_remind_enabled(user_id, enabled):
     except Exception as e:
         print(f"儲存新增作業提醒狀態失敗：{e}")
         return False
+
+def load_metadata(user_id):
+    ref = db.reference(f"users/{user_id}/meta")
+    return ref.get()
+
+def save_metadata(user_id, data):
+    ref = db.reference(f"users/{user_id}/meta")
+    ref.set(data)
     
 def get_batch_selection(user_id):
     """
@@ -295,31 +383,3 @@ def get_all_user_ids():
     ref = db.reference("users")
     users = ref.get()
     return list(users.keys()) if users else []
-
-def save_remind_time(user_id, time_str):
-    db.reference(f"users/{user_id}/remind_time").set(time_str)
-    # 變更時間 → 重設「已提醒」記號
-    db.reference(f"users/{user_id}/last_task_remind_date").delete()
-
-def save_add_task_remind_time(user_id, time_str):
-    db.reference(f"users/{user_id}/add_task_remind_time").set(time_str)
-    # 變更時間 → 重設「已提醒」記號
-    db.reference(f"users/{user_id}/last_add_task_remind_date").delete()
-
-def get_task_remind_enabled(user_id):
-    try:
-        ref = db.reference(f"users/{user_id}/task_remind_enabled")
-        enabled = ref.get()
-        return enabled if enabled is not None else True  # 預設啟用
-    except Exception as e:
-        print(f"獲取未完成作業提醒狀態失敗：{e}")
-        return True
-
-def save_task_remind_enabled(user_id, enabled):
-    """儲存是否啟用未完成作業提醒"""
-    try:
-        db.reference(f"users/{user_id}/task_remind_enabled").set(enabled)
-        return True
-    except Exception as e:
-        print(f"儲存未完成作業提醒狀態失敗：{e}")
-        return False
