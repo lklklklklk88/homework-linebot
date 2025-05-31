@@ -16,6 +16,29 @@ EMOJI_MAP = {
     'meeting': '👥'
 }
 
+def normalize_time(time_str):
+    """
+    標準化時間格式，處理超過 24:00 的情況
+    例如：25:30 -> 01:30 (隔天)
+    """
+    try:
+        parts = time_str.split(':')
+        if len(parts) != 2:
+            return time_str
+            
+        hours = int(parts[0])
+        minutes = int(parts[1])
+        
+        # 處理超過 24 小時的情況
+        if hours >= 24:
+            hours = hours % 24
+            # 可以在這裡加上 (隔天) 的標記
+            return f"{hours:02d}:{minutes:02d}"
+        
+        return time_str
+    except:
+        return time_str
+
 def make_enhanced_time_bubble(time_history: List[str], user_id: str) -> Dict[str, Any]:
     """
     增強版時間選擇泡泡，包含快速選項和智慧建議
@@ -322,8 +345,18 @@ def calculate_duration(start, end):
     計算時間區間的持續時間（分鐘）
     """
     try:
+        # 先標準化時間
+        start = normalize_time(start)
+        end = normalize_time(end)
+        
         start_time = datetime.datetime.strptime(start, "%H:%M")
         end_time = datetime.datetime.strptime(end, "%H:%M")
+        
+        # 如果結束時間小於開始時間，表示跨日
+        if end_time < start_time:
+            # 加上一天的時間
+            end_time += datetime.timedelta(days=1)
+        
         return int((end_time - start_time).total_seconds() / 60)
     except:
         return 0
@@ -356,6 +389,10 @@ def extract_schedule_blocks(text):
         if match:
             emoji, start, end, task, duration = match.groups()
             
+            # 標準化時間
+            start = normalize_time(start)
+            end = normalize_time(end)
+            
             # 檢查任務是否包含類別
             task_parts = task.split('｜')
             task_name = task_parts[0].strip()
@@ -382,6 +419,10 @@ def extract_schedule_blocks(text):
         if match_simple:
             start, end, task, duration = match_simple.groups()
             
+            # 標準化時間
+            start = normalize_time(start)
+            end = normalize_time(end)
+            
             # 計算時長
             if not duration:
                 duration = str(calculate_duration(start, end))
@@ -398,6 +439,26 @@ def extract_schedule_blocks(text):
     print("解析結果：", blocks)
     return blocks
 
+def format_time_range(start, end):
+    """
+    格式化時間範圍，處理跨日情況
+    """
+    start_normalized = normalize_time(start)
+    end_normalized = normalize_time(end)
+    
+    # 檢查是否跨日
+    try:
+        start_hour = int(start.split(':')[0])
+        end_hour = int(end.split(':')[0])
+        
+        # 如果原始結束時間 >= 24 或結束時間 < 開始時間，表示跨日
+        if int(end.split(':')[0]) >= 24 or (end_hour < start_hour and start_hour < 24):
+            return f"{start_normalized} ~ {end_normalized}(隔天)"
+        else:
+            return f"{start_normalized} ~ {end_normalized}"
+    except:
+        return f"{start_normalized} ~ {end_normalized}"
+
 def make_timetable_card(blocks, total_hours):
     """
     製作時間表卡片，使用簡潔的表格格式
@@ -407,11 +468,11 @@ def make_timetable_card(blocks, total_hours):
 
     rows = []
     for block in blocks:
-        time_range = f"{block['start']} ~ {block['end']}"
+        time_range = format_time_range(block['start'], block['end'])
         task_text = block['task']
         emoji = block.get('emoji', EMOJI_MAP['default'])
         
-        # 組合任務文字，只顯示時間和任務名稱
+        # 組合任務文字
         task_display = f"{emoji} {time_range}｜{task_text}"
 
         rows.append({
@@ -475,7 +536,7 @@ def make_optimized_schedule_card(blocks, total_hours, available_hours, pending_t
     # 建立時間軸視覺化
     timeline_contents = []
     for i, block in enumerate(blocks):
-        time_range = f"{block['start']} - {block['end']}"
+        time_range = format_time_range(block['start'], block['end'])
         emoji = block.get('emoji', '📌')
         task_name = block['task']
         category = block.get('category', '')
@@ -500,15 +561,16 @@ def make_optimized_schedule_card(blocks, total_hours, available_hours, pending_t
                 {
                     "type": "box",
                     "layout": "vertical",
-                    "flex": 1,  # 改為 flex: 1 讓時間佔一半
+                    "flex": 1,
                     "contents": [
                         {
                             "type": "text",
                             "text": time_range,
-                            "size": "sm",  # 改為 sm 讓字體稍大
+                            "size": "sm",
                             "color": "#666666",
                             "weight": "bold",
-                            "align": "center"
+                            "align": "center",
+                            "wrap": True
                         }
                     ]
                 },
@@ -519,7 +581,7 @@ def make_optimized_schedule_card(blocks, total_hours, available_hours, pending_t
                 {
                     "type": "box",
                     "layout": "vertical",
-                    "flex": 1,  # 作業部分也佔一半
+                    "flex": 1,
                     "contents": [
                         {
                             "type": "box",
@@ -535,7 +597,7 @@ def make_optimized_schedule_card(blocks, total_hours, available_hours, pending_t
                                     "color": text_color,
                                     "weight": "bold",
                                     "wrap": True,
-                                    "align": "center"  # 新增置中對齊
+                                    "align": "center"
                                 }
                             ]
                         }
@@ -657,7 +719,7 @@ def make_optimized_schedule_card(blocks, total_hours, available_hours, pending_t
                         },
                         {
                             "type": "separator",
-                            "color": "#FFFFFF"  # 透明分隔線
+                            "color": "#FFFFFF"
                         },
                         {
                             "type": "box",
