@@ -806,3 +806,60 @@ def make_optimized_schedule_card(blocks, total_hours, available_hours, pending_t
         })
     
     return bubble
+
+def parse_schedule_response(raw_text):
+    """
+    解析排程回應
+    """
+    print("原始回應：", raw_text)
+    
+    # 檢查是否包含排程標記
+    if "📅 今日排程" in raw_text:
+        parts = raw_text.split("📅 今日排程")
+        explanation = parts[0].strip()
+        schedule_text = "📅 今日排程" + parts[1].strip()
+        
+        # 從排程文字中提取總時數
+        total_hours_match = re.search(r'✅ 今日總時長：(\d+(?:\.\d+)?)', raw_text)
+        total_hours = float(total_hours_match.group(1)) if total_hours_match else 0
+    else:
+        # 如果沒有標記，嘗試直接解析
+        lines = raw_text.strip().split('\n')
+        schedule_lines = []
+        explanation_lines = []
+        
+        for line in lines:
+            if re.match(r'\d+\.\s*[^\s]+', line):
+                schedule_lines.append(line)
+            else:
+                explanation_lines.append(line)
+        
+        explanation = '\n'.join(explanation_lines).strip()
+        schedule_text = '\n'.join(schedule_lines).strip()
+        
+        # 計算總時數
+        blocks = extract_schedule_blocks(schedule_text)
+        total_hours = sum(float(block['duration'].replace('分鐘', '')) / 60 for block in blocks)
+
+    return explanation, schedule_text, total_hours
+
+def validate_schedule_time(blocks, available_hours):
+    """
+    驗證排程是否超過可用時間
+    """
+    if not blocks:
+        return True, 0
+    
+    total_minutes = 0
+    for block in blocks:
+        try:
+            duration_str = block.get('duration', '0分鐘')
+            minutes = int(duration_str.replace('分鐘', ''))
+            total_minutes += minutes
+        except:
+            pass
+    
+    total_hours = total_minutes / 60
+    is_valid = total_hours <= available_hours
+    
+    return is_valid, total_hours

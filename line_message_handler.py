@@ -223,15 +223,44 @@ def generate_schedule_for_user(user_id, available_hours):
         raw_text = call_gemini_schedule(prompt)
         
         # 解析回應
+        from flex_utils import parse_schedule_response, validate_schedule_time
         explanation, schedule_text, total_hours = parse_schedule_response(raw_text)
         blocks = extract_schedule_blocks(schedule_text)
+        
+        # 驗證時間是否超過限制
+        is_valid, actual_hours = validate_schedule_time(blocks, available_hours)
+        
+        if not is_valid:
+            # 如果超過時間，提醒使用者並重新生成
+            print(f"[警告] 排程超時：實際 {actual_hours} 小時 > 可用 {available_hours} 小時")
+            
+            # 嘗試重新生成一次，使用更嚴格的提示
+            stricter_prompt = prompt + f"\n\n⚠️ 重要：上次生成的排程超過了時間限制（{actual_hours}小時）。請嚴格控制在 {available_hours} 小時內！"
+            raw_text = call_gemini_schedule(stricter_prompt)
+            explanation, schedule_text, total_hours = parse_schedule_response(raw_text)
+            blocks = extract_schedule_blocks(schedule_text)
+            
+            # 再次驗證
+            is_valid, actual_hours = validate_schedule_time(blocks, available_hours)
+            if not is_valid:
+                # 如果還是超時，手動調整
+                blocks = adjust_schedule_to_fit(blocks, available_hours)
+                total_hours = available_hours
         
         # 創建優化的排程卡片
         schedule_card = make_optimized_schedule_card(blocks, total_hours, available_hours, pending_tasks)
         
         messages = []
+        
+        # 加入時間提醒
+        if actual_hours > available_hours:
+            messages.append(TextMessage(
+                text=f"⚠️ 注意：原始排程略超過您的可用時間，已自動調整為 {available_hours} 小時。"
+            ))
+        
         if explanation:
             messages.append(TextMessage(text=explanation))
+            
         if schedule_card:
             messages.append(FlexMessage(
                 alt_text="📅 今日最佳排程",
@@ -243,6 +272,77 @@ def generate_schedule_for_user(user_id, available_hours):
     except Exception as e:
         print(f"生成排程時發生錯誤：{str(e)}")
         return [TextMessage(text="抱歉，生成排程時發生錯誤，請稍後再試。")]
+
+def adjust_schedule_to_fit(blocks, available_hours):
+    """
+    調整排程以符合可用時間限制
+    """
+    if not blocks:
+        return blocks
+    
+    # 計算當前總時間
+    total_minutes = 0
+    for block in blocks:
+        try:
+            duration_str = block.get('duration', '0分鐘')
+            minutes = int(duration_str.replace('分鐘', ''))
+            total_minutes += minutes
+        except:
+            pass
+    
+    # 如果沒超時，直接返回
+    if total_minutes <= available_hours * 60:
+        return blocks
+    
+    # 計算需要削減的時間
+    excess_minutes = total_minutes - (available_hours * 60)
+    
+    # 優先削減休息時間
+    adjusted_blocks = []
+    remaining_excess = excess_minutes
+    
+    for block in blocks:
+        new_block = block.copy()
+        
+        if remaining_excess > 0 and ('休息' in block['task'] or '午餐' in block['task'] or '晚餐' in block['task']):
+            # 削減休息/用餐時間
+            try:
+                duration_str = block.get('duration', '0分鐘')
+                current_minutes = int(duration_str.replace('分鐘', ''))
+                
+                # 最多削減一半時間，但至少保留5分鐘
+                max_reduction = min(remaining_excess, current_minutes // 2)
+                if current_minutes - max_reduction >= 5:
+                    new_minutes = current_minutes - max_reduction
+                    new_block['duration'] = f"{new_minutes}分鐘"
+                    remaining_excess -= max_reduction
+                    
+                    # 更新結束時間
+                    if adjusted_blocks:
+                        prev_end = adjusted_blocks[-1]['end']
+                        new_block['start'] = prev_end
+                        # 計算新的結束時間
+                        start_hour, start_min = map(int, prev_end.split(':'))
+                        end_minutes = start_hour * 60 + start_min + new_minutes
+                        new_block['end'] = f"{(end_minutes // 60) % 24:02d}:{end_minutes % 60:02d}"
+            except:
+                pass
+        
+        adjusted_blocks.append(new_block)
+    
+    # 如果還有超時，移除最後的幾個任務
+    while remaining_excess > 0 and adjusted_blocks:
+        last_block = adjusted_blocks[-1]
+        if '休息' not in last_block['task'] and '午餐' not in last_block['task']:
+            try:
+                duration_str = last_block.get('duration', '0分鐘')
+                minutes = int(duration_str.replace('分鐘', ''))
+                remaining_excess -= minutes
+                adjusted_blocks.pop()
+            except:
+                break
+    
+    return adjusted_blocks
 
 def analyze_user_habits(user_id):
     """分析使用者習慣（可以根據歷史資料）"""
